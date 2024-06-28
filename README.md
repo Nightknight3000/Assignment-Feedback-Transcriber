@@ -1,10 +1,5 @@
 # Assignment Feedback
 
-*CLAUDIO*, the tool for "**C**ross-**l**inking **a**nalysis **u**sing **di**stances and **o**verlaps", allows
-for a methodical stepwise evaluation of cross-linking interaction types via in-depth analysis of structure and sequence 
-information. It returns structural restraints, which can be applied in structure predictions, and the input dataset
-extended by its analysis' results. 
-
 ## Prerequisites
 ### Python
 This tool is written in python (v3.11) and has thus to be run with python 3.\
@@ -46,7 +41,7 @@ configuration file (see example: config.txt).
 This tool returns all created feedbacks for the given assignments in Markdown format. 
 
 ### Example
-**CLAUDIO** (in full) can be run like this:
+The tool can be run like this:
 ```
 python3 assignment_feedback.py -c config.txt
 python3 assignment_feedback.py -o /home/user/docs/all_feedbacks -o /home/user/docs/configuration.txt
