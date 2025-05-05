@@ -55,10 +55,12 @@ def main(lecture_marker, output_dir, config):
                             os.mkdir(f"{output_dir}ass{assignment_no}")
                         with open(f"{output_dir}ass{assignment_no}/{lecture_marker}_ass{assignment_no}_feedback_{name}.md", 'w') as f:
                             f.write(out_str)
-                    elif total_points_reached <= total_max_points:
+                    elif total_points_reached > total_max_points:
                         print(f"Error. Total points calculated exceed total points intended:\n{out_str}\n")
-                    else:
+                    elif "TODO" in out_str:
                         print(f"Error. Found TODO in output:\n{out_str}\n")
+                    else:
+                        print(f"Unknown Error in output:\n{out_str}\n")
         else:
             print(f"Could not find {filepath}.")
             failed = True
