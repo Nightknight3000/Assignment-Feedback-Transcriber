@@ -6,7 +6,7 @@ from io import StringIO
 
 
 @click.command()
-@click.option("-l", "--lecture-marker", default="ssbi24")
+@click.option("-l", "--lecture-marker", default="ssbi25")
 @click.option("-o", "--output-dir", default="example")
 @click.option("-c", "--config", default="example/config_example.txt")
 def main(lecture_marker, output_dir, config):
