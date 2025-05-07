@@ -1,38 +1,38 @@
 # TODO
 # =====================================================
 number=1
-filepath=ssbi25/grading_ass01.txt
+filepath=ssbi25/grading_ass01.csv
 max_points={'1': '60', '2': '20', '3': '20'}
 # =====================================================
 number=2
-filepath=ssbi25/grading_ass02.txt
+filepath=ssbi25/grading_ass02.csv
 max_points={'1': '26', '2': '20', '3': '40', '4': '14'}
 # =====================================================
 number=3
-filepath=ssbi25/grading_ass03.txt
+filepath=ssbi25/grading_ass03.csv
 max_points={'1': '8', '2': '70', '3': '12', '4': '10'}
 # =====================================================
 number=4
-filepath=ssbi25/grading_ass04.txt
+filepath=ssbi25/grading_ass04.csv
 max_points={'1': '60', '2': '40'}
 # =====================================================
 number=5
-filepath=ssbi25/grading_ass05.txt
+filepath=ssbi25/grading_ass05.csv
 max_points={'1': '10', '2': '50', '3': '40'}
 # =====================================================
 number=7
-filepath=ssbi25/grading_ass07.txt
+filepath=ssbi25/grading_ass07.csv
 max_points={'1': '100'}
 # =====================================================
 number=8
-filepath=ssbi25/grading_ass08.txt
+filepath=ssbi25/grading_ass08.csv
 max_points={'1': '52', '2': '48'}
 # =====================================================
 number=9
-filepath=ssbi25/grading_ass09.txt
+filepath=ssbi25/grading_ass09.csv
 max_points={'1': '20', '2': '30', '3': '50'}
 # =====================================================
 number=10
-filepath=ssbi25/grading_ass010.txt
+filepath=ssbi25/grading_ass010.csv
 max_points={'1': '50', '2': '50'}
 # =====================================================
