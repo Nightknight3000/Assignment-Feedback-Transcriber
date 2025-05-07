@@ -33,7 +33,7 @@ def main(lecture_marker, output_dir, config):
                 for name in names.split(','):
                     out_str = ''
                     for task, point_comment in point_list.items():
-                        if ':' in point_comment:
+                        if ':' in str(point_comment):
                             points, comment = point_comment.split(':', 1)
                         else:
                             points = point_comment
