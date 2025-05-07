@@ -22,7 +22,10 @@ def main(lecture_marker, output_dir, config):
         empty_table_str = "task,points_reached,points_max,comment\n"
         for task, max_points in tasks_and_max_points.items():
             empty_table_str += f"{task},,{max_points},\n"
-        empty_table = pd.read_csv(StringIO(empty_table_str), sep=',', index_col=False)
+        empty_table = pd.read_csv(StringIO(empty_table_str),
+                                  sep=',',
+                                  index_col=False,
+                                  dtype={'task': int, 'points_reached': float, 'points_max': float, 'comment': str})
 
         if os.path.exists(filepath):
             # sanity test
@@ -39,8 +42,8 @@ def main(lecture_marker, output_dir, config):
                             points = point_comment
                             comment = ''
                         comment = comment.replace('|', '\n')
-                        empty_table.loc[int(task) - 1, "points_reached"] = points
-                        empty_table.loc[int(task) - 1, "comment"] = comment
+                        empty_table.loc[int(task) - 1, "points_reached"] = float(points)
+                        empty_table.loc[int(task) - 1, "comment"] = str(comment)
                     out_str += empty_table.to_markdown(index=None)
                     try:
                         total_points_reached = empty_table["points_reached"].astype(float).sum()
