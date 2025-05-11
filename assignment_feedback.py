@@ -87,6 +87,7 @@ def main(lecture_marker, output_dir, config, database, assignment_sheet):
 def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
     try:
         df = pd.read_excel(xlsx_file, engine='openpyxl')
+        df['Grade'] = ''
         table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
         conn = sqlite3.connect(sqlite_file)
         df.to_sql(table_name, conn, if_exists='replace', index=False)

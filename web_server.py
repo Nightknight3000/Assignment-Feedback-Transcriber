@@ -8,6 +8,7 @@ from io import BytesIO
 import sqlite3
 from assignment_feedback import read_config
 import re
+import json
 
 def get_db_connection(db='ssbi25.sqlite3'):
     """Create a new database connection for the current thread"""
@@ -53,8 +54,14 @@ app.layout = dbc.Container([
                 options=[
                     {"label": assignment, "value": assignment} for assignment in assignment_list
                 ],
-            )
+            ),
         ], className='col-2'),
+        dbc.Col(
+            dcc.Upload(
+                html.Button('Upload grading from other tutors', className="btn btn-primary"),
+                id='upload-db',style={'textAlign': 'center'}
+            )
+        ),
         dbc.Col(dbc.Button("Generate Feedbacks", id='generate', className="btn btn-primary", style={'width': '95%'}), className='col-2 mx-auto'),
     ], className='mt-3'),
     dbc.Row([
@@ -119,7 +126,7 @@ def get_grading_view(team, assignment):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute(f"SELECT [First Name], [Last Name] FROM [{assignment}] WHERE Team = ?", (team,))
+        cursor.execute(f"SELECT [First Name], [Last Name], [Grade] FROM [{assignment}] WHERE Team = ?", (team,))
         students = cursor.fetchall()
         student_names = [f"{student['First Name']} {student['Last Name']}" for student in students]
     except sqlite3.Error as e:
@@ -127,6 +134,8 @@ def get_grading_view(team, assignment):
     
     # Get the scores and names from config files (or database maybe?)
     per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_num-1]
+    try: grades = json.loads(students[0]['Grade'])
+    except: grades = {}
     children = [
         dbc.ModalHeader([dbc.ModalTitle("Grading View for Team "), dbc.ModalTitle(team, id='team-name', className='ms-2')]), 
         dbc.ModalBody(dbc.Container([
@@ -138,11 +147,18 @@ def get_grading_view(team, assignment):
         ] + [dbc.Row([
                 # task title and the button
                 dbc.Col(html.H3(f"Task {task}"), className='mx-auto col-3'),
-                dbc.Col(dbc.Button("Add Comment Line", id={'type': 'add-comment', 'index': task}, className='btn btn-secondary'), className='mx-auto col-3'),
+                dbc.Col(dbc.Button("Add Comment Line", id={'type': 'add-comment', 'index': task}, className='btn btn-secondary',
+                                    # update n_clicks to match the comment saving state
+                                    n_clicks=0 if len(grades) == 0 or not grades.get(task, False) else len(grades.get(task))
+                                  ), className='mx-auto col-3'),
                 dbc.Col([html.Span(score, id={'type': 'per-task-total-score', 'index': task}), html.Span(f"/{score} points reached")], className='mx-auto col-6 align-items-center justify-content-end d-flex'),
                 
                 # comments input boxes
-                html.Div(id={'type': 'comment-placeholder', 'index': task}),
+                html.Div(id={'type': 'comment-placeholder', 'index': task}) if len(grades) == 0 or not grades.get(task, False) else 
+                        # if there are saved comments, show them
+                        html.Div([
+                            get_comment_row(f"{task}_{i}", comment) for i, comment in enumerate(grades[task])
+                        ], id={'type': 'comment-placeholder', 'index': task}),
                 # spacer
                 html.Hr(className='mt-3 mb-3'),
             ]) for task, score in per_task_scores.items()]
@@ -158,13 +174,21 @@ def add_comment_row(n_clicks):
     index = f"{task}_{n_clicks}"
     patched_children = Patch()
     patched_children.append(
-        dbc.Row([
-            dbc.Col(dbc.Button("❌", color='warning', id={'type': 'remove-comment', 'index': index}), width=1, className='mt-1'),
-            dbc.Col(dbc.Input(type='number', placeholder='Penalty', id={'type': 'penalty-input', 'index': index}), width=3, className='mt-1'),
-            dbc.Col(dbc.Input(type='text', placeholder='Comment', id={'type': 'comment-input', 'index': index}), width=8, className='mt-1'),
-        ], id={'type': 'comment-row', 'index': index}),
+        get_comment_row(index)
     )
     return patched_children
+
+def get_comment_row(index, comment=None):
+    if not comment:
+        penalty = None
+    else:
+        penalty = comment[0]
+        comment = comment[1]
+    return dbc.Row([
+        dbc.Col(dbc.Button("❌", color='warning', id={'type': 'remove-comment', 'index': index}), width=1, className='mt-1'),
+        dbc.Col(dbc.Input(type='number', placeholder='Penalty', id={'type': 'penalty-input', 'index': index}, value=penalty), width=3, className='mt-1'),
+        dbc.Col(dbc.Input(type='text', placeholder='Comment', id={'type': 'comment-input', 'index': index}, value=comment), width=8, className='mt-1'),
+    ], id={'type': 'comment-row', 'index': index})
 
 @callback(Output({'type': 'comment-row', 'index': MATCH}, 'children'),
         Input({'type': 'remove-comment', 'index': MATCH}, 'n_clicks'),
@@ -172,8 +196,6 @@ def add_comment_row(n_clicks):
 def remove_comment_row(n_clicks):
     if n_clicks is None:
         raise dash.exceptions.PreventUpdate
-    triggered = ctx.triggered_id
-    task = triggered['index']
     return None
 
 @callback(Input('save-button', 'n_clicks'),
@@ -181,8 +203,9 @@ def remove_comment_row(n_clicks):
         State({'type': 'comment-input', 'index': ALL}, 'value'),
         State({'type': 'comment-input', 'index': ALL}, 'id'),
         State('team-name', 'children'),
+        State('assignment-select', 'value'),
         prevent_initial_call=True)
-def save_gradings(save, penalties, comments, tasks, team_name):
+def save_gradings(save, penalties, comments, tasks, team_name, assignment):
     feedbacks = {}
     for task, penalty, comment in zip(tasks, penalties, comments):
         if not task: continue
@@ -192,21 +215,41 @@ def save_gradings(save, penalties, comments, tasks, team_name):
             feedbacks[task] = []
         feedbacks[task].append((penalty, comment))
 
-    # TODO: Save feedbacks to the somewhere, and how?
+    # Save the feedbacks to the database
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Before saving, check if the feedbacks already exist (for multiple tutor grading at the same time)
+    # This way we can only add new comments but not overwrite the existing ones
+    # existing_feedbacks = cursor.execute(f"SELECT Grade FROM [{assignment}] WHERE Team = ?", (team_name,)).fetchone()
+    # if existing_feedbacks:
+    #     existing_feedbacks = json.loads(existing_feedbacks['Grade'])
+    #     existing_tasks = set(existing_feedbacks.keys())
+    #     my_tasks = set(feedbacks.keys())
+    #     # one tutor only responsible for their own tasks
+    #     for task in existing_tasks - my_tasks:
+    #         feedbacks[task] = existing_feedbacks[task]
+    feedbacks_json = json.dumps(feedbacks)
+    cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?", 
+                    (feedbacks_json, team_name))
+    conn.commit()
+    conn.close()
 
     set_props('toast-save', {'is_open': True})
     set_props('toast-save', {'children': "Feedback saved successfully!"})
     set_props(f'graded_{team_name}', {'className': 'fa-solid fa-check'})
 
-@callback(Input({'type': 'penalty-input', 'index': ALL}, 'value'),
+@callback(Input('modal-view', 'is_open'),
+          Input({'type': 'penalty-input', 'index': ALL}, 'value'),
         State({'type': 'comment-input', 'index': ALL}, 'id'),
-        State('assignment-select', 'value'),
-        prevent_initial_call=True)
-def update_score(penalties, tasks, assignment):
-    # Get the scores from config files (or database maybe?)
+        State('assignment-select', 'value'))
+def update_score(ready_to_update, penalties, tasks, assignment):
+    if not ready_to_update:
+        raise dash.exceptions.PreventUpdate
+    
     assignment_match = re.search(r'\d+$', assignment)
-    assignment_num = int(assignment_match.group()) if assignment_match else None
-    per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_num-1]
+    assignment_id = int(assignment_match.group()) if assignment_match else None
+    per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
 
     penalties_gropued = {}
     for task, penalty in zip(tasks, penalties):
@@ -220,12 +263,70 @@ def update_score(penalties, tasks, assignment):
     for task, penalty in penalties_gropued.items():
         total_penalty = sum(penalties_gropued[task])
         if total_penalty > 0: total_penalty = -total_penalty
-        score = per_task_scores[task] + total_penalty
+        score = int(per_task_scores[task]) + total_penalty
         if score < 0:
             score = 0
-        if score > per_task_scores[task]:
-            score = per_task_scores[task]
+        if score > int(per_task_scores[task]):
+            score = int(per_task_scores[task])
         set_props({'type': 'per-task-total-score', 'index': task}, {'children': str(score)})
+
+
+@callback(Input('upload-db', 'contents'),
+        Input('upload-db', 'filename'),
+        Input('upload-db', 'last_modified'),
+        State('assignment-select', 'value'),
+        prevent_initial_call=True)
+def merge_grading_from_other_tutors(content, name, last_modified, assignment):
+    content_type, content_string = content.split(',')
+    decoded = base64.b64decode(content_string)
+    name = name+'new'
+    with open(name, 'wb') as f:
+        f.write(decoded)
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    try:
+        # Connect to the uploaded database
+        other_conn = sqlite3.connect(name)
+        other_conn.row_factory = sqlite3.Row
+        other_cursor = other_conn.cursor()
+        other_cursor.execute(f"SELECT Team, Grade FROM [{assignment}]")
+        other_grades = other_cursor.fetchall()
+
+        # Process each record from the uploaded database
+        for row in other_grades:
+            team = row['Team']
+            uploaded_grade = row['Grade']
+
+            if not uploaded_grade:
+                continue
+
+            cursor.execute(f"SELECT Grade FROM [{assignment}] WHERE Team = ?", (team,))
+            local_record = cursor.fetchone()
+
+            if local_record:
+                try:
+                    uploaded_grades = json.loads(uploaded_grade)
+                    local_grades = json.loads(local_record['Grade']) if local_record['Grade'] else {}
+
+                    for task, comments in uploaded_grades.items():
+                        local_grades[task] = comments
+
+                    cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?", 
+                                  (json.dumps(local_grades), team))
+                except:
+                    continue
+        conn.commit()
+        other_conn.close()
+
+        set_props('toast-save', {'is_open': True})
+        set_props('toast-save', {'children': "Grades from other tutors merged successfully!"})
+    except sqlite3.Error as e:
+        set_props('toast-save', {'is_open': True})
+        set_props('toast-save', {'children': f"Error merging grades: {str(e)}"})
+    finally:
+        if os.path.exists(name):
+            os.remove(name)
 
 @callback(Output('downloader', 'data'),
         Input('generate', 'n_clicks'),
