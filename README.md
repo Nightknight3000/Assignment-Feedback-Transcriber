@@ -9,6 +9,9 @@ Packages:
 * click
 * pandas
 * tabulate
+* dash
+* openpyxl
+* dash-bootstrap-components
 
 The packages may be installed all at once with the file [requirements.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/requirements.txt):
 ```
@@ -19,6 +22,9 @@ or individually:
 pip install click
 pip install pandas
 pip install tabulate
+pip install dash
+pip install openpyxl
+pip install dash-bootstrap-components
 ```
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.
@@ -33,6 +39,18 @@ the tool.
 -o,    --output-directory,      output directory for produced subdirectories and assignment feedbacks, default="example"
 -c,    --config,                filepath to configuration file containing all specifications of the assignments, default='example/config_example.txt'
 ```
+
+### Web service
+Download all submissions from ILIAS. An `xlsx` file will also be created. Put them into database through the command:
+
+```
+python3 assignment_feedback.py -d ssbi25.sqlite3 -a 'Assignment 1.xlsx'
+```
+
+This will create a table named `Assignment 1` in `ssbi25.sqlite3`. Then launch the web server through `python3 web_server.py`.
+
+To merge the gradings from other tutors, there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current assignment will be merged into the local database.
+
 ### Input
 This tool requires multiple CSV-files, each associated with assignment containing its feedback and the reached points 
 of each task (see example: [example/grading_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/grading_example.txt)).
