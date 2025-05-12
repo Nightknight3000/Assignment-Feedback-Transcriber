@@ -2,6 +2,8 @@ import ast
 import os
 import click
 import pandas as pd
+import sqlite3
+import openpyxl
 from io import StringIO
 
 
@@ -9,7 +11,18 @@ from io import StringIO
 @click.option("-l", "--lecture-marker", default="ssbi25")
 @click.option("-o", "--output-dir", default="example")
 @click.option("-c", "--config", default="example/config_example.txt")
-def main(lecture_marker, output_dir, config):
+@click.option("-d", "--database", help="Import Excel file to SQLite database. Format: xlsx_file:sqlite_file", required=False)
+@click.option("-a", "--assignment-sheet", help="Assignment ?.xlsx from ILIAS", required=False)
+def main(lecture_marker, output_dir, config, database, assignment_sheet):
+    # If database option is provided, run excel_to_sqlite and return
+    if database:
+        try:
+            excel_to_sqlite(assignment_sheet, database)
+            return
+        except ValueError:
+            print("Error: Database option format must be 'xlsx_file:sqlite_file'")
+            return
+
     output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir
     assignments = read_config(config)
 
@@ -71,6 +84,19 @@ def main(lecture_marker, output_dir, config):
             print(f"Finished writing outputs for {filepath}.")
 
 
+def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
+    try:
+        df = pd.read_excel(xlsx_file, engine='openpyxl')
+        df['Grade'] = ''
+        table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
+        conn = sqlite3.connect(sqlite_file)
+        df.to_sql(table_name, conn, if_exists='replace', index=False)
+        print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
+        conn.close()
+    except Exception as e:
+        print(f"Error importing Excel to SQLite: {str(e)}")
+
+
 def read_config(config: str) -> dict[str, list[str]]:
     assignments = {"nums": [], "files": [], "tasks": []}
     with open(config, 'r') as f:
@@ -103,6 +129,7 @@ def test_no_of_elements(lines: list[str], max_num: int) -> None:
                 print(line.split(','))
                 raise Exception(f"Error! Found {element_count}, not the expected {max_num}, number of elements in line "
                                 f"{i + 1} in your grading file.")
+
 
 
 if __name__ == "__main__":

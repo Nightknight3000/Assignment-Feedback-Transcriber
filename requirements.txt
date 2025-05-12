@@ -1,3 +1,6 @@
 click
 pandas
 tabulate
+dash
+openpyxl
+dash-bootstrap-components
