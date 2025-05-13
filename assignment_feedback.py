@@ -3,7 +3,6 @@ import os
 import click
 import pandas as pd
 import sqlite3
-import openpyxl
 from io import StringIO
 
 
@@ -11,26 +10,26 @@ from io import StringIO
 @click.option("-l", "--lecture-marker", default="ssbi25")
 @click.option("-o", "--output-dir", default="example")
 @click.option("-c", "--config", default="example/config_example.txt")
-@click.option("-d", "--database", help="Import Excel file to SQLite database. Format: xlsx_file:sqlite_file", required=False)
-@click.option("-a", "--assignment-sheet", help="Assignment ?.xlsx from ILIAS", required=False)
-def main(lecture_marker, output_dir, config, database, assignment_sheet):
-    # If database option is provided, run excel_to_sqlite and return
-    if database:
-        try:
-            excel_to_sqlite(assignment_sheet, database)
-            return
-        except ValueError:
-            print("Error: Database option format must be 'xlsx_file:sqlite_file'")
-            return
+@click.option("-a", "--assignment-xlsx", help="Assignment ?.xlsx from ILIAS", required=False)
+def main(lecture_marker, output_dir, config, assignment_xlsx):
 
     output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir
-    assignments = read_config(config)
+    assignments = read_config(config, lecture_marker)
 
     for i in range(len(assignments["nums"])):
         failed = False
         assignment_no = assignments["nums"][i]
         filepath = assignments["files"][i]
         tasks_and_max_points = assignments["tasks"][i]
+        assignment_xlsx = assignments["ass_xl"][i]
+        database = assignments["db"][i]
+
+        # If Ilias Assignment excel was given, create database
+        if assignment_xlsx:
+            try:
+                excel_to_sqlite(assignment_xlsx, output_dir + database)
+            except ValueError:
+                print("Error: Database option format must be 'xlsx_file:sqlite_file'")
 
         empty_table_str = "task,points_reached,points_max,comment\n"
         for task, max_points in tasks_and_max_points.items():
@@ -44,7 +43,10 @@ def main(lecture_marker, output_dir, config, database, assignment_sheet):
             # sanity test
             test_no_of_elements(open(filepath, 'r').read().split('\n'), len(tasks_and_max_points))
 
-            df = pd.read_csv(filepath, sep=',', index_col=0)
+            try:
+                df = pd.read_csv(filepath, sep=',', index_col=0)
+            except pd.errors.ParserError as e:
+                raise IOError(f"Unable to parse csv {filepath} with pandas (Message: {e})")
             for names, point_list in {name: {task: df.loc[name, task] for task in df.columns} for name in df.index}.items():
                 for name in names.split(','):
                     out_str = ''
@@ -93,21 +95,29 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
         df.to_sql(table_name, conn, if_exists='replace', index=False)
         print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
         conn.close()
+    except FileNotFoundError as e:
+        print(f"Could not find {xlsx_file}")
     except Exception as e:
         print(f"Error importing Excel to SQLite: {str(e)}")
 
 
-def read_config(config: str) -> dict[str, list[str]]:
-    assignments = {"nums": [], "files": [], "tasks": []}
+def read_config(config: str, lecture_marker: str = '') -> dict[str, list[str]]:
+    assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": [], "db": []}
     with open(config, 'r') as f:
         lines = f.read().split('\n')
+        current_num = 0
         for line in lines:
             if line.startswith('number='):
-                assignments['nums'].append(int(line.replace('number=', '')))
+                num = int(line.replace('number=', ''))
+                assignments['nums'].append(num)
+                current_num = num
             elif line.startswith('filepath='):
                 assignments["files"].append(line.replace('filepath=', ''))
             elif line.startswith('max_points='):
                 assignments["tasks"].append(ast.literal_eval(line.replace('max_points=', '')))
+            elif line.startswith('assignment_xlsx='):
+                assignments["ass_xl"].append(line.replace('assignment_xlsx=', ''))
+                assignments["db"].append(f"{lecture_marker}_ass{current_num}.sqlite3")
     if len(assignments["nums"]) != len(assignments["files"]) != len(assignments["tasks"]):
         raise IOError("Configuration must contain equal number of assignment numbers, filepaths, and max_points.")
     return assignments
