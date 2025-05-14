@@ -1,14 +1,18 @@
-from dash import Dash, callback, html, Input, Output, State, dcc, ALL, ctx, MATCH, Patch, set_props
-import pandas as pd
-import dash
-import os
-import dash_bootstrap_components as dbc
 import base64
-from io import BytesIO
-import sqlite3
-from assignment_feedback import read_config
-import re
 import json
+import os
+import re
+import sqlite3
+
+import dash
+import dash_bootstrap_components as dbc
+import markdown
+import pandas as pd
+from assignment_feedback import read_config
+from dash import (ALL, MATCH, Dash, Input, Output, Patch, State, callback, ctx,
+                  dcc, html, set_props)
+# from weasyprint import HTML
+
 
 def get_db_connection(db='ssbi25.sqlite3'):
     """Create a new database connection for the current thread"""
@@ -340,4 +344,4 @@ def generate_feedback(generate):
     pass
 
 if __name__ == '__main__':
-    app.run_server(debug=True, port=8050)
+    app.run(debug=True, port=8050)

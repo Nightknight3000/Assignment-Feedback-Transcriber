@@ -4,3 +4,4 @@ tabulate
 dash
 openpyxl
 dash-bootstrap-components
+markdown
