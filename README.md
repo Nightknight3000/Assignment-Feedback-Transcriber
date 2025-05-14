@@ -33,7 +33,7 @@ the tool.
 ## Usage
 ### The CLI - Command Line Interface
 ```
-> python3 assignment_feedback.py [-l <str>] [-o <directorypath>] [-c <filepath>] 
+> python3 assignment_feedback.py [-l <str>] [-o <directorypath>] [-c <filepath>] [-a <filepath>]
  
 -l,    --lecture-marker,        string-marker to be added to output filenames, default="ssbi25"
 -o,    --output-directory,      output directory for produced subdirectories and assignment feedbacks, default="example"
