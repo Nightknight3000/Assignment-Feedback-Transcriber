@@ -12,7 +12,6 @@ Packages:
 * dash
 * openpyxl
 * dash-bootstrap-components
-* markdown
 
 The packages may be installed all at once with the file [requirements.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/requirements.txt):
 ```
@@ -26,7 +25,6 @@ pip install tabulate
 pip install dash
 pip install openpyxl
 pip install dash-bootstrap-components
-pip install markdown
 ```
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.
@@ -44,7 +42,7 @@ the tool.
 ```
 
 ### Web service
-Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English**). An `xlsx` file will also be created. Put them into database through the command:
+Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Put them into database through the command:
 
 ```
 python3 assignment_feedback.py -a 'Assignment 1.xlsx'
