@@ -38,16 +38,17 @@ the tool.
 -l,    --lecture-marker,        string-marker to be added to output filenames, default="ssbi25"
 -o,    --output-directory,      output directory for produced subdirectories and assignment feedbacks, default="example"
 -c,    --config,                filepath to configuration file containing all specifications of the assignments, default='example/config_example.txt'
+-a,    --assignment-xlsx,       Assignment ?.xlsx from ILIAS, required=False
 ```
 
 ### Web service
 Download all submissions from ILIAS. An `xlsx` file will also be created. Put them into database through the command:
 
 ```
-python3 assignment_feedback.py -d ssbi25.sqlite3 -a 'Assignment 1.xlsx'
+python3 assignment_feedback.py -a 'Assignment 1.xlsx'
 ```
 
-This will create a table named `Assignment 1` in `ssbi25.sqlite3`. Then launch the web server through `python3 web_server.py`.
+This will create a table named `Assignment 1` in `ssbi25_assX.sqlite3`. Then launch the web server through `python3 web_server.py`.
 
 To merge the gradings from other tutors, there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current assignment will be merged into the local database.
 
@@ -80,3 +81,4 @@ python3 assignment_feedback.py -o /home/user/docs/all_feedbacks -c /home/user/do
 
 ## Authors
 * **Alexander Röhl**
+* **Haoran Sun**
