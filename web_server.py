@@ -11,7 +11,7 @@ import pandas as pd
 from assignment_feedback import read_config
 from dash import (ALL, MATCH, Dash, Input, Output, Patch, State, callback, ctx,
                   dcc, html, set_props)
-# from weasyprint import HTML
+
 
 
 def get_db_connection(db='ssbi25.sqlite3'):
@@ -88,8 +88,8 @@ def get_submission_list(assignment):
             for index, row in group.iterrows():
                 grouped_dfs.append({
                     "Graded": html.I(className="fa-solid fa-circle-info", id=f"graded_{team}") if addViewButton == 0 else "",
-                    "First Name": row['First Name'],
-                    "Last Name": row['Last Name'],
+                    "First Name": row['First Name' if 'First Name' in group.columns else "Vorname"],
+                    "Last Name": row['Last Name' if 'Last Name' in group.columns else "Nachname"],
                     "Team": team,
                     "": dbc.Button("View", id={'type': 'view-button', 'index': team}, className="btn btn-primary") if addViewButton == 0 else "",
                 })
@@ -134,7 +134,12 @@ def get_grading_view(team, assignment):
         students = cursor.fetchall()
         student_names = [f"{student['First Name']} {student['Last Name']}" for student in students]
     except sqlite3.Error as e:
-        student_names = [f"Error loading students: {str(e)}"]
+        try:
+            cursor.execute(f"SELECT [Vorname], [Nachname], [Grade] FROM [{assignment}] WHERE Team = ?", (team,))
+            students = cursor.fetchall()
+            student_names = [f"{student['Vorname']} {student['Nachname']}" for student in students]
+        except sqlite3.Error as e:
+            student_names = [f"Error loading students: {str(e)}"]
     
     # Get the scores and names from config files (or database maybe?)
     per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_num-1]

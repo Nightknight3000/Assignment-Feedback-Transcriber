@@ -3,36 +3,45 @@
 number=1
 filepath=ssbi25/grading_ass01.csv
 max_points={'1': '60', '2': '20', '3': '20'}
+assignment_xlsx=ssbi25/Assignment 1.xlsx
 # =====================================================
 number=2
 filepath=ssbi25/grading_ass02.csv
 max_points={'1': '26', '2': '20', '3': '40', '4': '14'}
+assignment_xlsx=ssbi25/Assignment 2.xlsx
 # =====================================================
 number=3
 filepath=ssbi25/grading_ass03.csv
 max_points={'1': '8', '2': '70', '3': '12', '4': '10'}
+assignment_xlsx=ssbi25/Assignment 3.xlsx
 # =====================================================
 number=4
 filepath=ssbi25/grading_ass04.csv
 max_points={'1': '60', '2': '40'}
+assignment_xlsx=ssbi25/Assignment 4.xlsx
 # =====================================================
 number=5
 filepath=ssbi25/grading_ass05.csv
 max_points={'1': '10', '2': '50', '3': '40'}
+assignment_xlsx=ssbi25/Assignment 5.xlsx
 # =====================================================
 number=7
 filepath=ssbi25/grading_ass07.csv
 max_points={'1': '100'}
+assignment_xlsx=ssbi25/Assignment 7.xlsx
 # =====================================================
 number=8
 filepath=ssbi25/grading_ass08.csv
 max_points={'1': '52', '2': '48'}
+assignment_xlsx=ssbi25/Assignment 8.xlsx
 # =====================================================
 number=9
 filepath=ssbi25/grading_ass09.csv
 max_points={'1': '20', '2': '30', '3': '50'}
+assignment_xlsx=ssbi25/Assignment 9.xlsx
 # =====================================================
 number=10
 filepath=ssbi25/grading_ass010.csv
 max_points={'1': '50', '2': '50'}
+assignment_xlsx=ssbi25/Assignment 10.xlsx
 # =====================================================
