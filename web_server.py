@@ -1,13 +1,20 @@
-from dash import Dash, callback, html, Input, Output, State, dcc, ALL, ctx, MATCH, Patch, set_props
-import pandas as pd
-import dash
-import os
-import dash_bootstrap_components as dbc
 import base64
-import sqlite3
-from assignment_feedback import read_config
-import re
 import json
+import os
+import re
+import sqlite3
+import zipfile
+
+import dash
+import dash_bootstrap_components as dbc
+import pandas as pd
+from assignment_feedback import read_config
+import shutil
+from dash import (ALL, MATCH, Dash, Input, Output, Patch, State, callback, ctx,
+                  dcc, html, set_props)
+
+# Read this from config file in the future
+DB_PATH = 'ssbi25.sqlite3'
 
 def get_db_connection(db='ssbi25.sqlite3'):
     """Create a new database connection for the current thread"""
@@ -15,7 +22,7 @@ def get_db_connection(db='ssbi25.sqlite3'):
     connection.row_factory = sqlite3.Row
     return connection
 
-db = get_db_connection()
+db = get_db_connection(DB_PATH)
 
 # Get assignment names from the database
 cursor = db.cursor()
@@ -59,8 +66,7 @@ app.layout = dbc.Container([
             dcc.Upload(
                 html.Button('Upload grading from other tutors', className="btn btn-primary"),
                 id='upload-db',style={'textAlign': 'center'}
-            )
-        ),
+            ), width='auto'),
         dbc.Col(dbc.Button("Generate Feedbacks", id='generate', className="btn btn-primary", style={'width': '95%'}), className='col-2 mx-auto'),
     ], className='mt-3'),
     dbc.Row([
@@ -72,8 +78,13 @@ app.layout = dbc.Container([
         Input('assignment-select', 'value'),
         prevent_initial_call=True)
 def get_submission_list(assignment):
-    conn = get_db_connection()
+    conn = get_db_connection(DB_PATH)
     df = pd.read_sql_query(f"SELECT * FROM [{assignment}]", conn)
+
+    assignment_match = re.search(r'\d+$', assignment)
+    assignment_id = int(assignment_match.group()) if assignment_match else None
+    per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
+
     # Check if 'Team' column exists
     if 'Team' in df.columns:
         # Group by Teams
@@ -81,16 +92,36 @@ def get_submission_list(assignment):
         for team, group in df.groupby('Team'):
             addViewButton = 0
             for index, row in group.iterrows():
-                grouped_dfs.append({
-                    "Graded": html.I(className="fa-solid fa-circle-info", id=f"graded_{team}") if addViewButton == 0 else "",
+                try: feedbacks = json.loads(row['Grade'])
+                except: feedbacks = {}
+
+                # names and teams
+                row_dict = {
+                    "Graded": html.I(className="fa-solid fa-circle-info" if not feedbacks else "fa-solid fa-check", id=f"graded_{team}") if addViewButton == 0 else "",
                     "First Name": row['First Name' if 'First Name' in group.columns else "Vorname"],
                     "Last Name": row['Last Name' if 'Last Name' in group.columns else "Nachname"],
                     "Team": team,
-                    "": dbc.Button("View", id={'type': 'view-button', 'index': team}, className="btn btn-primary") if addViewButton == 0 else "",
-                })
+                }
+                # per task scores
+                for task, max_points in per_task_scores.items():
+                    remaining_points = int(max_points)
+                    if task not in feedbacks.keys():
+                        row_dict[f"Task {task}"] = max_points
+                    else:
+                        for penalty, comment in feedbacks[task]:
+                            if penalty is None:
+                                if comment is None: continue
+                                else: penalty = 0
+                            if penalty >= 0: penalty = -penalty
+                            remaining_points += penalty
+                        if remaining_points < 0: remaining_points = 0
+                        row_dict[f"Task {task}"] = remaining_points
+                row_dict[""] = dbc.Button("View", id={'type': 'view-button', 'index': team}, className="btn btn-primary") if addViewButton == 0 else ""
+                grouped_dfs.append(row_dict)
                 addViewButton += 1
         df_new = pd.DataFrame(grouped_dfs)
         return dbc.Table.from_dataframe(df_new, striped=True, bordered=False, hover=True)
+    # logic for individual submissions haven't been implemented yet
     else:
         submission_cols = [col for col in df.columns if col.startswith('Submission')]
         if submission_cols:
@@ -122,7 +153,7 @@ def get_grading_view(team, assignment):
     assignment_match = re.search(r'\d+$', assignment)
     assignment_num = int(assignment_match.group()) if assignment_match else None
     
-    conn = get_db_connection()
+    conn = get_db_connection(DB_PATH)
     cursor = conn.cursor()
     try:
         cursor.execute(f"SELECT [First Name], [Last Name], [Grade] FROM [{assignment}] WHERE Team = ?", (team,))
@@ -220,7 +251,7 @@ def save_gradings(save, penalties, comments, tasks, team_name, assignment):
         feedbacks[task].append((penalty, comment))
 
     # Save the feedbacks to the database
-    conn = get_db_connection()
+    conn = get_db_connection(DB_PATH)
     cursor = conn.cursor()
     
     # Before saving, check if the feedbacks already exist (for multiple tutor grading at the same time)
@@ -286,8 +317,7 @@ def merge_grading_from_other_tutors(content, name, last_modified, assignment):
     name = name + 'new'
     with open(name, 'wb') as f:
         f.write(decoded)
-    conn = get_db_connection()
-    conn.row_factory = sqlite3.Row
+    conn = get_db_connection(DB_PATH)
     cursor = conn.cursor()
     try:
         # Connect to the uploaded database
@@ -344,14 +374,83 @@ def merge_grading_from_other_tutors(content, name, last_modified, assignment):
 
 @callback(Output('downloader', 'data'),
         Input('generate', 'n_clicks'),
+        State('assignment-select', 'value'),
         prevent_initial_call=True)
-def generate_feedback(generate):
-    # TODO: Implement feedback generation logic
-    # dcc.send_data_frame(df.to_csv, "mydf.csv")
-    # dict(content="Hello world!", filename="hello.txt")
+def generate_feedback(generate, assignment):
+    if not assignment:
+        set_props('toast-save', {'is_open': True})
+        set_props('toast-save', {'children': "You need to select an assignment!"})
+        return dash.no_update
 
-    # Or just generate a file on the disk but not download it?
-    pass
+    assignment_match = re.search(r'\d+$', assignment)
+    assignment_id = int(assignment_match.group()) if assignment_match else None
+    per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
+
+    os.makedirs('feedbacks', exist_ok=True)
+    conn = get_db_connection(DB_PATH)
+    groups = pd.read_sql_query(f"SELECT [First Name], [Last Name], Team, Grade FROM [{assignment}]", conn)
+    conn.close()
+
+    for team, group in groups.groupby('Team'):
+        members = group.reset_index(drop=True)
+        student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}" for student in members.iterrows()]
+
+        try: feedbacks = json.loads(members.at[0, 'Grade'])
+        except: feedbacks = {}
+
+        overall_score = 0
+        markdown_str = f"# Feedback on {assignment} for Team {team}\n\n"
+        markdown_str += f"Students: {', '.join(student_names)}\n\n"
+
+        tasks_str = ''
+        for task, max_points in per_task_scores.items():
+            remaining_points = int(max_points)
+            tasks_str += f"## Task {task}\n\n"
+
+            # If the student has got full marks on this task
+            if task not in feedbacks.keys():
+                tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
+                tasks_str += f"Well done, you have got full marks on this task!\n\n"
+            # If the student has got penalties on this task
+            else:
+                penalty_str = f"Penalties:\n\n"
+                for penalty, comment in feedbacks[task]:
+                    if penalty is None:
+                        if comment is None: continue
+                        else: penalty = 0
+                    if penalty >= 0: penalty = -penalty
+                    penalty_str += f"- **{penalty}** points: {comment}\n\n"
+                    remaining_points += penalty
+                if remaining_points < 0: remaining_points = 0
+
+                tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
+                if remaining_points == int(max_points):
+                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
+                else:
+                    tasks_str += penalty_str
+
+            overall_score += remaining_points
+
+        markdown_str += f"Overall Score: **{overall_score}/100**\n\n"
+        markdown_str += tasks_str
+
+        lastnames = [student[1]['Last Name'] for student in members.iterrows()]
+        with open(os.path.join('feedbacks', f"{team}_{"_".join(lastnames)}.md"), 'w') as f:
+            f.write(markdown_str)
+
+    # zip the files
+    with zipfile.ZipFile(f"Feedbacks_{assignment}.zip", 'w') as zipf:
+        for file in os.listdir('feedbacks'):
+            zipf.write(os.path.join('feedbacks', file), os.path.relpath(os.path.join('feedbacks', file), 'feedbacks'))
+
+    # clean up
+    with open(f"Feedbacks_{assignment}.zip", 'rb') as f:
+        zip_byte = f.read()
+    os.remove(f"Feedbacks_{assignment}.zip")
+    shutil.rmtree('feedbacks', ignore_errors=True)
+
+    return dcc.send_bytes(zip_byte, f"Feedbacks_{assignment}.zip")
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8050)

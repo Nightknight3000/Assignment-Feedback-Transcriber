@@ -12,6 +12,8 @@ Packages:
 * dash
 * openpyxl
 * dash-bootstrap-components
+* selenium
+* rich
 
 The packages may be installed all at once with the file [requirements.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/requirements.txt):
 ```
@@ -25,24 +27,26 @@ pip install tabulate
 pip install dash
 pip install openpyxl
 pip install dash-bootstrap-components
+pip install selenium
+pip install rich
 ```
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.
 
 ## Input
 ### Input through Web service - (Recommended)
-Download all submissions from ILIAS. An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
+Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
 
 ```
-python3 assignment_feedback.py -c config.txt'
+
+python3 assignment_feedback.py -l <lecture-marker> -c config.txt'
 ```
 
-This will create a table for every xlsx specified in the configuration named `Assignment X` in `ssbi25_assX.sqlite3`.
+This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `<lecture-marker>.sqlite3`.
 Then launch the web server through:
 ```
 python3 web_server.py
 ```
-
 To merge the gradings from other tables (ex. from other tutors), there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current assignment will be merged into the local database.
 
 ### Manual Input - (Optional)
@@ -70,10 +74,17 @@ The provided information on points and feedback should be split by a comma and e
 The enumeration, the paths, and the maximum reachable points of each task need to be specified and given in a separate 
 configuration file (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)).
 
-### Output
+## Output
 This tool returns all created feedbacks for the given assignments in Markdown format (see example: [example/ass1](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/ass1)). 
 
-### Example
+## Automatic upload
+Finally, this tool allows to automatically upload the resulting feedbacks onto Ilias, by running:
+```
+> python3 assignment_feedback.py -u <path to directory containing the feedbacks>
+```
+**Note:** Running the script with this argument fully changes its mode of operation, i.e. it will be unable to perform Manual Input if called like this.
+
+## Example
 The tool can be run like this:
 ```
 # For webserver usage
