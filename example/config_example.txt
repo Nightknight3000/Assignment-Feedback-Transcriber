@@ -1,6 +1,7 @@
 # TODO
 # =====================================================
 number=1
-filepath=data/grading_example.txt
+filepath=example/grading_example.txt
 max_points={'1': '27.5', '2': '3', '3': '101'}
+assignment_xlsx=example/Assignment 1.xlsx
 # =====================================================
