@@ -290,6 +290,7 @@ def create_app(lecture_marker='ssbi25'):
             State({'type': 'comment-input', 'index': ALL}, 'id'),
             State('assignment-select', 'value'))
     def update_score(ready_to_update, penalties, tasks, assignment):
+        """Update the scores in the grading view after changing the penalties"""
         if not ready_to_update:
             raise dash.exceptions.PreventUpdate
         
@@ -323,6 +324,7 @@ def create_app(lecture_marker='ssbi25'):
             State('assignment-select', 'value'),
             prevent_initial_call=True)
     def merge_grading_from_other_tutors(content, name, last_modified, assignment):
+        """Merge grading from other tutors into the current database"""
         content_type, content_string = content.split(',')
         decoded = base64.b64decode(content_string)
         name = name + 'new'
@@ -367,6 +369,7 @@ def create_app(lecture_marker='ssbi25'):
 
             set_props('toast-save', {'is_open': True})
             set_props('toast-save', {'children': "Grades from other tutors merged successfully!"})
+            set_props('submission-list', {'children': get_submission_list(assignment)})
         except sqlite3.Error as e:
             set_props('toast-save', {'is_open': True})
             set_props('toast-save', {'children': f"Error merging grades: {str(e)}"})
