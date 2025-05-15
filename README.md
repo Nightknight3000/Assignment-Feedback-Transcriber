@@ -43,6 +43,7 @@ the tool.
 -o,    --output-directory,      output directory for produced subdirectories and assignment feedbacks, default="example"
 -c,    --config,                filepath to configuration file containing all specifications of the assignments, default='example/config_example.txt'
 -a,    --assignment-xlsx,       Assignment ?.xlsx from ILIAS, required=False
+-u,    --feedback-dir,          The directory of feedbacks to upload, required=False
 ```
 
 ### Web service
