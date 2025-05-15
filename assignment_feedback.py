@@ -10,8 +10,7 @@ from io import StringIO
 @click.option("-l", "--lecture-marker", default="ssbi25")
 @click.option("-o", "--output-dir", default="example")
 @click.option("-c", "--config", default="example/config_example.txt")
-@click.option("-a", "--assignment-xlsx", help="Assignment ?.xlsx from ILIAS", required=False)
-def main(lecture_marker, output_dir, config, assignment_xlsx):
+def main(lecture_marker, output_dir, config):
 
     output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir
     assignments = read_config(config, lecture_marker)
@@ -24,7 +23,7 @@ def main(lecture_marker, output_dir, config, assignment_xlsx):
         assignment_xlsx = assignments["ass_xl"][i]
         database = assignments["db"][i]
 
-        # If Ilias Assignment excel was given, create database
+        # If Ilias Assignment excel was given, attempt to create database
         if assignment_xlsx:
             try:
                 excel_to_sqlite(assignment_xlsx, output_dir + database)
@@ -64,7 +63,7 @@ def main(lecture_marker, output_dir, config, assignment_xlsx):
                         total_points_reached = empty_table["points_reached"].astype(float).sum()
                         total_max_points = empty_table["points_max"].astype(float).sum()
                         out_str += f'\nTotal points reached: {total_points_reached} of {total_max_points}'
-                    except Exception:
+                    except ValueError:
                         print(f"Found non-floatable value in feedback for {name}.")
                         continue
 
@@ -95,7 +94,7 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
         df.to_sql(table_name, conn, if_exists='replace', index=False)
         print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
         conn.close()
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         print(f"Could not find {xlsx_file}")
     except Exception as e:
         print(f"Error importing Excel to SQLite: {str(e)}")
