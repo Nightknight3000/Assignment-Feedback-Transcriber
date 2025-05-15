@@ -14,6 +14,7 @@ def main(lecture_marker, output_dir, config):
 
     output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir
     assignments = read_config(config, lecture_marker)
+    database_name = f"{lecture_marker}.sqlite3"
 
     for i in range(len(assignments["nums"])):
         failed = False
@@ -24,16 +25,15 @@ def main(lecture_marker, output_dir, config):
         # Check whether Ilias Assignment excel was given
         try:
             assignment_xlsx = assignments["ass_xl"][i]
-            database = assignments["db"][i]
         except IndexError:
             assignment_xlsx = None
-            database = None
-            print(f"No path specified for Ilias assignment excel for assignment no.{assignment_no}.\nSkipping database creation.")
+            print(f"No path specified for Ilias assignment excel for assignment no.{assignment_no}.\n"
+                  f"Skipping database table creation.")
 
         # If Ilias Assignment excel was given, attempt to create database
         if assignment_xlsx:
             try:
-                excel_to_sqlite(assignment_xlsx, output_dir + database)
+                excel_to_sqlite(assignment_xlsx, output_dir + database_name)
             except ValueError:
                 print("Error: Database option format must be 'xlsx_file:sqlite_file'")
 
@@ -108,22 +108,19 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
 
 
 def read_config(config: str, lecture_marker: str = '') -> dict[str, list[str]]:
-    assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": [], "db": []}
+    assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": []}
     with open(config, 'r') as f:
         lines = f.read().split('\n')
-        current_num = 0
         for line in lines:
             if line.startswith('number='):
                 num = int(line.replace('number=', ''))
                 assignments['nums'].append(num)
-                current_num = num
             elif line.startswith('filepath='):
                 assignments["files"].append(line.replace('filepath=', ''))
             elif line.startswith('max_points='):
                 assignments["tasks"].append(ast.literal_eval(line.replace('max_points=', '')))
             elif line.startswith('assignment_xlsx='):
                 assignments["ass_xl"].append(line.replace('assignment_xlsx=', ''))
-                assignments["db"].append(f"{lecture_marker}_ass{current_num}.sqlite3")
     if len(assignments["nums"]) != len(assignments["files"]) != len(assignments["tasks"]):
         raise IOError("Configuration must contain equal number of assignment numbers, filepaths, and max_points.")
     return assignments
