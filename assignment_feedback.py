@@ -11,6 +11,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
+_GERMAN_LANGUAGE_CONSTANTS = {'Vorname': 'First Name',
+                              'Nachname': "Last Name"}
+
+
 @click.command()
 @click.option("-l", "--lecture-marker", default="ssbi25")
 @click.option("-o", "--output-dir", default="example")
@@ -106,6 +111,12 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
     try:
         df = pd.read_excel(xlsx_file, engine='openpyxl')
         df['Grade'] = ''
+        df.insert(0, 'id', range(1, len(df) + 1))
+        df.set_index('id', inplace=True)
+
+        # Swap from german to english
+        df = translate_df_columns_to_english(df)
+
         table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
         conn = sqlite3.connect(sqlite_file)
         df.to_sql(table_name, conn, if_exists='replace', index=False)
@@ -115,6 +126,14 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
         print(f"Could not find {xlsx_file}")
     except Exception as e:
         print(f"Error importing Excel to SQLite: {str(e)}")
+
+
+def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
+    if 'Vorname' in df.columns:
+        return df.rename(mapper=_GERMAN_LANGUAGE_CONSTANTS, axis=1)
+    else:
+        return df
+
 
 
 def read_config(config: str, lecture_marker: str = '') -> dict[str, list[str]]:

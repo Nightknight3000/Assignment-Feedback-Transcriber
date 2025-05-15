@@ -98,8 +98,8 @@ def get_submission_list(assignment):
                 # names and teams
                 row_dict = {
                     "Graded": html.I(className="fa-solid fa-circle-info" if not feedbacks else "fa-solid fa-check", id=f"graded_{team}") if addViewButton == 0 else "",
-                    "First Name": row['First Name' if 'First Name' in group.columns else "Vorname"],
-                    "Last Name": row['Last Name' if 'Last Name' in group.columns else "Nachname"],
+                    "First Name": row['First Name'],
+                    "Last Name": row['Last Name'],
                     "Team": team,
                 }
                 # per task scores
@@ -160,12 +160,7 @@ def get_grading_view(team, assignment):
         students = cursor.fetchall()
         student_names = [f"{student['First Name']} {student['Last Name']}" for student in students]
     except sqlite3.Error as e:
-        try:
-            cursor.execute(f"SELECT [Vorname], [Nachname], [Grade] FROM [{assignment}] WHERE Team = ?", (team,))
-            students = cursor.fetchall()
-            student_names = [f"{student['Vorname']} {student['Nachname']}" for student in students]
-        except sqlite3.Error as e:
-            student_names = [f"Error loading students: {str(e)}"]
+        student_names = [f"Error loading students: {str(e)}"]
     
     # Get the scores and names from config files (or database maybe?)
     per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_num-1]
