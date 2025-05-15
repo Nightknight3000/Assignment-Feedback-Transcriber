@@ -20,8 +20,15 @@ def main(lecture_marker, output_dir, config):
         assignment_no = assignments["nums"][i]
         filepath = assignments["files"][i]
         tasks_and_max_points = assignments["tasks"][i]
-        assignment_xlsx = assignments["ass_xl"][i]
-        database = assignments["db"][i]
+
+        # Check whether Ilias Assignment excel was given
+        try:
+            assignment_xlsx = assignments["ass_xl"][i]
+            database = assignments["db"][i]
+        except IndexError:
+            assignment_xlsx = None
+            database = None
+            print(f"No path specified for Ilias assignment excel for assignment no.{assignment_no}.\nSkipping database creation.")
 
         # If Ilias Assignment excel was given, attempt to create database
         if assignment_xlsx:
