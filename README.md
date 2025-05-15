@@ -12,6 +12,8 @@ Packages:
 * dash
 * openpyxl
 * dash-bootstrap-components
+* selenium
+* rich
 
 The packages may be installed all at once with the file [requirements.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/requirements.txt):
 ```
@@ -25,6 +27,8 @@ pip install tabulate
 pip install dash
 pip install openpyxl
 pip install dash-bootstrap-components
+pip install selenium
+pip install rich
 ```
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.

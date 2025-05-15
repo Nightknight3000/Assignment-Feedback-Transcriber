@@ -1,17 +1,29 @@
+import re
 import ast
 import os
 import click
 import pandas as pd
 import sqlite3
 from io import StringIO
-
+from rich.progress import Progress, TextColumn, BarColumn, MofNCompleteColumn
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 @click.command()
 @click.option("-l", "--lecture-marker", default="ssbi25")
 @click.option("-o", "--output-dir", default="example")
 @click.option("-c", "--config", default="example/config_example.txt")
 @click.option("-a", "--assignment-xlsx", help="Assignment ?.xlsx from ILIAS", required=False)
-def main(lecture_marker, output_dir, config, assignment_xlsx):
+@click.option("-u", "--feedback-dir", help="The directory of feedbacks to upload", required=False)
+def main(lecture_marker, output_dir, config, assignment_xlsx, feedback_dir):
+
+    if feedback_dir:
+        if not os.path.exists(feedback_dir):
+            raise IOError(f"Feedback directory {feedback_dir} does not exist.")
+        upload_to_ilias(feedback_dir)
+        return
 
     output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir
     assignments = read_config(config, lecture_marker)
@@ -140,7 +152,77 @@ def test_no_of_elements(lines: list[str], max_num: int) -> None:
                 raise Exception(f"Error! Found {element_count}, not the expected {max_num}, number of elements in line "
                                 f"{i + 1} in your grading file.")
 
+def upload_to_ilias(feedback_dir) -> None:
+    print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
+    driver = webdriver.Edge()
+    driver.get("https://ovidius.uni-tuebingen.de/")
+    print("Navigate to the Hands-in page and select the corresponsing assignment.")
 
+    # While waiting for the user
+    per_team_feedbacks = {}
+    for file in os.listdir(feedback_dir):
+        team_number = file.split('_')[0]
+        per_team_feedbacks[team_number] = os.path.join(os.path.abspath(feedback_dir), file)
+
+    input("Press Enter when you are ready to upload feedbacks...")
+    with Progress(TextColumn("[green]Uploading feedbacks..."),
+                BarColumn(),
+                MofNCompleteColumn()) as progress:
+        task = progress.add_task("[green]Uploading feedbacks...", total=len(per_team_feedbacks))
+        for team, feedback_file in per_team_feedbacks.items():
+            table = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
+            )
+            rows = table.find_elements(By.TAG_NAME, "tr")
+
+            for row in rows[1:]:
+                # Find team name in small div with parentheses
+                try:
+                    small_div = row.find_element(By.CLASS_NAME, "small")
+                    team_name_text = small_div.text
+                    team_number = re.search(r'\((\d+)\)', team_name_text)
+
+                    # In SSBI, only team submissions are accepted
+                    if team_number:
+                        team_number = team_number.group(1)
+                        if team != team_number: continue
+
+                        driver.execute_script("arguments[0].scrollIntoView(true);", row)
+                        driver.implicitly_wait(1)
+
+                        # Actions dropdown
+                        actions_cell = row.find_element(By.XPATH, ".//td[contains(.//div/@class, 'dropdown')]")
+                        dropdown_button = actions_cell.find_element(By.XPATH, ".//button[contains(@class, 'dropdown-toggle')]")
+                        try: dropdown_button.click()
+                        except Exception: driver.execute_script("arguments[0].click();", dropdown_button)
+                        driver.implicitly_wait(1)
+
+                        # Evaluation by File
+                        evaluation_button = row.find_element(By.XPATH, ".//button[contains(text(), 'Evaluation by File')]")
+                        try: evaluation_button.click()
+                        except Exception: driver.execute_script("arguments[0].click();", evaluation_button)
+                        driver.implicitly_wait(1)
+
+                        # Upload feedback file
+                        file_input = driver.find_element(By.ID, "new_file")
+                        file_input.send_keys(feedback_file)
+                        upload_button = driver.find_element(By.XPATH, "//input[@type='submit' and @name='cmd[uploadFile]']")
+                        upload_button.click()
+                        WebDriverWait(driver, 20).until(
+                            EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-success')] | //table[contains(@class, 'table-striped')]//a"))
+                        )
+
+                        # Return
+                        print(f"Successfully uploaded feedback for team {team_number}")
+                        driver.back()
+                        WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
+                        )
+                        progress.advance(task)
+                        break
+
+                except Exception as e:
+                    print(f"Error processing row: {str(e)}")
 
 if __name__ == "__main__":
     main()
