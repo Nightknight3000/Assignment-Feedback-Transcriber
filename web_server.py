@@ -435,7 +435,7 @@ def generate_feedback(generate, assignment):
         markdown_str += tasks_str
 
         lastnames = [student[1]['Last Name'] for student in members.iterrows()]
-        with open(os.path.join('feedbacks', f"{team}_{"_".join(lastnames)}.md"), 'w') as f:
+        with open(os.path.join('feedbacks', f"{team}_{'_'.join(lastnames)}.md"), 'w') as f:
             f.write(markdown_str)
 
     # zip the files
