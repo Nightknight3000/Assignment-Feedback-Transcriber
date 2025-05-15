@@ -400,7 +400,7 @@ def generate_feedback(generate, assignment):
             # If the student has got full marks on this task
             if task not in feedbacks.keys():
                 tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
-                tasks_str += f"Well done, you have got full marks on this task!\n"
+                tasks_str += f"Well done, you have got full marks on this task!\n\n"
             # If the student has got penalties on this task
             else:
                 penalty_str = f"Penalties:\n\n"
@@ -415,7 +415,7 @@ def generate_feedback(generate, assignment):
 
                 tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
                 if remaining_points == int(max_points):
-                    tasks_str += f"Well done, you have got full marks on this task!\n"
+                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
                 else:
                     tasks_str += penalty_str
 
