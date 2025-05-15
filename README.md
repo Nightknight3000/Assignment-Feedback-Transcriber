@@ -33,34 +33,34 @@ pip install rich
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.
 
+## Input
+### Input through Web service - (Recommended)
+Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
 
-## Usage
-### The CLI - Command Line Interface
 ```
-> python3 assignment_feedback.py [-l <str>] [-o <directorypath>] [-c <filepath>] [-a <filepath>]
+
+python3 assignment_feedback.py -l <lecture-marker> -c config.txt'
+```
+
+This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `<lecture-marker>.sqlite3`.
+Then launch the web server through:
+```
+python3 web_server.py
+```
+To merge the gradings from other tables (ex. from other tutors), there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current assignment will be merged into the local database.
+
+### Manual Input - (Optional)
+If you wish to use the tool without the web server, you require multiple CSV-files, each associated with an assignment. 
+The CSV-files should each contain the reached points as well as the associated feedback of each task (see example: [example/grading_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/grading_example.txt)).
+#### The CLI - Command Line Interface
+```
+> python3 assignment_feedback.py [-l <str>] [-o <directorypath>] [-c <filepath>]
  
 -l,    --lecture-marker,        string-marker to be added to output filenames, default="ssbi25"
 -o,    --output-directory,      output directory for produced subdirectories and assignment feedbacks, default="example"
 -c,    --config,                filepath to configuration file containing all specifications of the assignments, default='example/config_example.txt'
--a,    --assignment-xlsx,       Assignment ?.xlsx from ILIAS, required=False
--u,    --feedback-dir,          The directory of feedbacks to upload, required=False
 ```
-
-### Web service
-Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Put them into database through the command:
-
-```
-python3 assignment_feedback.py -a 'Assignment 1.xlsx'
-```
-
-This will create a table named `Assignment 1` in `ssbi25_assX.sqlite3`. Then launch the web server through `python3 web_server.py`.
-
-To merge the gradings from other tutors, there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current selected assignment will be merged into the local database.
-
-### Input
-This tool requires multiple CSV-files, each associated with assignment containing its feedback and the reached points 
-of each task (see example: [example/grading_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/grading_example.txt)).
-Each line of the CSV-files are to contain these information, each split by a comma and each surrounded by quotation-marks:
+The provided information on points and feedback should be split by a comma and each surrounded by quotation-marks (to allow for the use of regular comma without breaking the format):
 * List of all group members: \
   ``"<member_1>,<member_2>,<member_X>"``
 * Feedbacks for each task (3 options)
@@ -74,14 +74,25 @@ Each line of the CSV-files are to contain these information, each split by a com
 The enumeration, the paths, and the maximum reachable points of each task need to be specified and given in a separate 
 configuration file (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)).
 
-### Output
+## Output
 This tool returns all created feedbacks for the given assignments in Markdown format (see example: [example/ass1](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/ass1)). 
 
-### Example
+## Automatic upload
+Finally, this tool allows to automatically upload the resulting feedbacks onto Ilias, by running:
+```
+> python3 assignment_feedback.py -u <path to directory containing the feedbacks>
+```
+**Note:** Running the script with this argument fully changes its mode of operation, i.e. it will be unable to perform Manual Input if called like this.
+
+## Example
 The tool can be run like this:
 ```
-python3 assignment_feedback.py -c example/config_example.txt
-python3 assignment_feedback.py -o /home/user/docs/all_feedbacks -c /home/user/docs/configuration.txt
+# For webserver usage
+> python3 web_server.py
+
+# For manual usage
+> python3 assignment_feedback.py -c example/config_example.txt
+> python3 assignment_feedback.py -o /home/user/docs/all_feedbacks -c /home/user/docs/configuration.txt
 ```
 
 ## Authors

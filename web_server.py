@@ -307,14 +307,14 @@ def update_score(ready_to_update, penalties, tasks, assignment):
 
 
 @callback(Input('upload-db', 'contents'),
-        Input('upload-db', 'filename'),
-        Input('upload-db', 'last_modified'),
-        State('assignment-select', 'value'),
-        prevent_initial_call=True)
+          Input('upload-db', 'filename'),
+          Input('upload-db', 'last_modified'),
+          State('assignment-select', 'value'),
+          prevent_initial_call=True)
 def merge_grading_from_other_tutors(content, name, last_modified, assignment):
     content_type, content_string = content.split(',')
     decoded = base64.b64decode(content_string)
-    name = name+'new'
+    name = name + 'new'
     with open(name, 'wb') as f:
         f.write(decoded)
     conn = get_db_connection(DB_PATH)
@@ -359,6 +359,16 @@ def merge_grading_from_other_tutors(content, name, last_modified, assignment):
         set_props('toast-save', {'is_open': True})
         set_props('toast-save', {'children': f"Error merging grades: {str(e)}"})
     finally:
+        # add connection close for second connection, in case sql operation failed without closing first
+        try:
+            other_conn.close()
+        except sqlite3.Error:
+            # connection already closed
+            pass
+        except NameError:
+            # connection was never defined
+            pass
+
         if os.path.exists(name):
             os.remove(name)
 
