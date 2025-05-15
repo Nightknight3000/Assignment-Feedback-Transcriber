@@ -38,14 +38,14 @@ the tool.
 Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
 
 ```
-
-python3 assignment_feedback.py -l <lecture-marker> -c config.txt'
+python3 assignment_feedback.py -l ssbi25 -c ssbi25/config_ssbi25.txt -o ssbi25
 ```
 
-This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `<lecture-marker>.sqlite3`.
+This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `ssbi25.sqlite3`.
+
 Then launch the web server through:
 ```
-python3 web_server.py
+python3 assignment_feedback.py -l ssbi25 -w
 ```
 To merge the gradings from other tables (ex. from other tutors), there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current assignment will be merged into the local database.
 
