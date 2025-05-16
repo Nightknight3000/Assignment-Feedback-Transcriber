@@ -64,7 +64,7 @@ def create_app(lecture_marker='ssbi25'):
         dcc.Download(id="downloader"),
         dbc.Modal(id="modal-view", size="lg", is_open=False, backdrop="static", centered=True),
         dbc.Toast("", id="toast-save", header="Info", is_open=False, duration=3000,
-                style={"position": "fixed", "top": 66, "right": 10, "width": 350}),
+                style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
         dbc.Row([
             dbc.Col(html.Span("Select Assignment: ", className='h5'), width='auto'),
             dbc.Col([
@@ -282,7 +282,7 @@ def create_app(lecture_marker='ssbi25'):
         conn.close()
 
         set_props('toast-save', {'is_open': True})
-        set_props('toast-save', {'children': "Feedback saved successfully!"})
+        set_props('toast-save', {'children': html.Span([html.I(className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}) ,"Feedback saved successfully!"])})
         set_props(f'graded_{team_name}', {'className': 'fa-solid fa-check'})
 
     @dash_app.callback(Input('modal-view', 'is_open'),
@@ -368,11 +368,11 @@ def create_app(lecture_marker='ssbi25'):
             other_conn.close()
 
             set_props('toast-save', {'is_open': True})
-            set_props('toast-save', {'children': "Grades from other tutors merged successfully!"})
+            set_props('toast-save', {'children': html.Span([html.I(className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}) ,"Grades from other tutors merged successfully!"])})
             set_props('submission-list', {'children': get_submission_list(assignment)})
         except sqlite3.Error as e:
             set_props('toast-save', {'is_open': True})
-            set_props('toast-save', {'children': f"Error merging grades: {str(e)}"})
+            set_props('toast-save', {'children': html.Span([html.I(className="fa-solid fa-square-xmark me-1", style={"color": "#ff3333"}) ,f"Error merging grades: {str(e)}"])})
         finally:
             # add connection close for second connection, in case sql operation failed without closing first
             try:
