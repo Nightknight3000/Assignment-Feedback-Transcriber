@@ -38,12 +38,12 @@ the tool.
 Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
 ```
 
-python3 assignment_feedback.py -l <lecture-marker> -c config.txt'
+python3 assignment_feedback.py -l <lecture-marker> -o <directorypath> -c <filepath>'
 ```
 This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `<lecture-marker>.sqlite3`.
-Then launch the web server through:
+Then launch the web server through (with `-l` and `-o`set with the same values as before):
 ```
-python3 assignment_feedback.py -l <lecture_marker> -w
+python3 assignment_feedback.py -l <lecture-marker> -o <directorypath> -w
 ```
 **Important**: Always utilize the most recently-created empty database to run your webserver, if there have been changes to the number of xlsx-files. This ensures that all tables for newer xlsx-files are set up.\\
 You may then merge older versions into it via the "Upload grading from other tutors"-button, to refill it with previous feedbacks.\\

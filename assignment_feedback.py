@@ -23,7 +23,7 @@ def main(lecture_marker, output_dir, config, feedback_dir, web_server):
         app.run(host='127.0.0.1', debug=False, port=8050)
     else:
       output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir
-      assignments = read_config(config, lecture_marker)
+      assignments = read_config(config)
       database_name = f"{lecture_marker}.sqlite3"
 
       for i in range(len(assignments["nums"])):
