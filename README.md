@@ -36,18 +36,20 @@ the tool.
 ## Input
 ### Input through Web service - (Recommended)
 Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
-
 ```
 
 python3 assignment_feedback.py -l <lecture-marker> -c config.txt'
 ```
-
 This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `<lecture-marker>.sqlite3`.
 Then launch the web server through:
 ```
-python3 web_server.py
+python3 assignment_feedback.py -l <lecture_marker> -w
 ```
-To merge the gradings from other tables (ex. from other tutors), there is a button in the web page. Upload the `sqlite3` database, and the gradings of the current assignment will be merged into the local database.
+**Important**: Always utilize the most recently-created empty database to run your webserver, if there have been changes to the number of xlsx-files. This ensures that all tables for newer xlsx-files are set up.\\
+You may then merge older versions into it via the "Upload grading from other tutors"-button, to refill it with previous feedbacks.\\
+Likewise you may merge the gradings from your colleagues.\\
+
+Rule-of-thumb: Always use the database with the most tables in it, and merge the rest into them (since merging a database with more tables won't add these). 
 
 ### Manual Input - (Optional)
 If you wish to use the tool without the web server, you require multiple CSV-files, each associated with an assignment. 
@@ -85,14 +87,23 @@ Finally, this tool allows to automatically upload the resulting feedbacks onto I
 **Note:** Running the script with this argument fully changes its mode of operation, i.e. it will be unable to perform Manual Input if called like this.
 
 ## Example
-The tool can be run like this:
+The webserver pipeline of this tool would look like this (requires specification of xlsx-files in config.txt):
 ```
-# For webserver usage
-> python3 web_server.py
+# Setup database
+> python3 assignment_feedback.py -l ssbi25 -c config.txt
 
+# Run webserver utilizing the database
+> python3 assignment_feedback.py -l ssbi25 -w
+# TODO: Use GUI to input points and comments, then create feedback archive
+
+# Upload feedback to Ilias
+> python3 assignment_feedback.py -u feedback.zip
+```
+
+The manual pipeline for this tool would look like this (requires specification of csv-files containing points and comments in config.txt):
+```
 # For manual usage
 > python3 assignment_feedback.py -c example/config_example.txt
-> python3 assignment_feedback.py -o /home/user/docs/all_feedbacks -c /home/user/docs/configuration.txt
 ```
 
 ## Authors
