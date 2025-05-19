@@ -1,19 +1,20 @@
-import base64
-import json
 import os
 import re
-import secrets
+import json
 import shutil
+import base64
+import secrets
 import sqlite3
 import zipfile
+import pandas as pd
 
 import dash
 import dash_bootstrap_components as dbc
-import pandas as pd
-from helper_functions import read_config
 from dash import (ALL, MATCH, Dash, Input, Output, Patch, State, ctx, dcc,
                   html, set_props)
 from flask import Flask, current_app, g
+
+from src.utils import read_config
 
 
 def get_db():
@@ -26,12 +27,14 @@ def get_db():
 
     return g.db
 
-def create_app(lecture_marker='ssbi25'):
+
+def create_app(lecture_marker='ssbi25', output_dir=''):
     app = Flask(lecture_marker, instance_relative_config=True)
     app.config.from_mapping(
-        DATABASE=os.path.join(lecture_marker, f'{lecture_marker}.sqlite3'),
+        DATABASE=os.path.join(output_dir, f'{lecture_marker}.sqlite3'),
         SECRET_KEY=secrets.token_hex(),
     )
+    print(os.path.abspath(app.config['DATABASE']))
     print(f"Database path: {app.config['DATABASE']}")
 
     with app.app_context():
@@ -64,7 +67,7 @@ def create_app(lecture_marker='ssbi25'):
         dcc.Download(id="downloader"),
         dbc.Modal(id="modal-view", size="lg", is_open=False, backdrop="static", centered=True),
         dbc.Toast("", id="toast-save", header="Info", is_open=False, duration=3000,
-                style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
+                  style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
         dbc.Row([
             dbc.Col(html.Span("Select Assignment: ", className='h5'), width='auto'),
             dbc.Col([
@@ -166,7 +169,7 @@ def create_app(lecture_marker='ssbi25'):
         # Extract assignment number from the assignment name
         assignment_match = re.search(r'\d+$', assignment)
         assignment_num = int(assignment_match.group()) if assignment_match else None
-        
+
         with app.app_context():
             conn = get_db()
         cursor = conn.cursor()
@@ -176,13 +179,13 @@ def create_app(lecture_marker='ssbi25'):
             student_names = [f"{student['First Name']} {student['Last Name']}" for student in students]
         except sqlite3.Error as e:
             student_names = [f"Error loading students: {str(e)}"]
-        
+
         # Get the scores and names from config files (or database maybe?)
         per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_num-1]
         try: grades = json.loads(students[0]['Grade'])
         except: grades = {}
         children = [
-            dbc.ModalHeader([dbc.ModalTitle("Grading View for Team "), dbc.ModalTitle(team, id='team-name', className='ms-2')]), 
+            dbc.ModalHeader([dbc.ModalTitle("Grading View for Team "), dbc.ModalTitle(team, id='team-name', className='ms-2')]),
             dbc.ModalBody(dbc.Container([
                 dbc.Row([
                     dbc.Col(html.H5("Student Name: " + ", ".join(student_names)), className='col-auto'),
@@ -197,9 +200,9 @@ def create_app(lecture_marker='ssbi25'):
                                         n_clicks=0 if len(grades) == 0 or not grades.get(task, False) else len(grades.get(task))
                                     ), className='mx-auto col-3'),
                     dbc.Col([html.Span(score, id={'type': 'per-task-total-score', 'index': task}), html.Span(f"/{score} points reached")], className='mx-auto col-6 align-items-center justify-content-end d-flex'),
-                    
+
                     # comments input boxes
-                    html.Div(id={'type': 'comment-placeholder', 'index': task}) if len(grades) == 0 or not grades.get(task, False) else 
+                    html.Div(id={'type': 'comment-placeholder', 'index': task}) if len(grades) == 0 or not grades.get(task, False) else
                             # if there are saved comments, show them
                             html.Div([
                                 get_comment_row(f"{task}_{i}", comment) for i, comment in enumerate(grades[task])
@@ -264,7 +267,7 @@ def create_app(lecture_marker='ssbi25'):
         with app.app_context():
             conn = get_db()
         cursor = conn.cursor()
-        
+
         # Before saving, check if the feedbacks already exist (for multiple tutor grading at the same time)
         # This way we can only add new comments but not overwrite the existing ones
         # existing_feedbacks = cursor.execute(f"SELECT Grade FROM [{assignment}] WHERE Team = ?", (team_name,)).fetchone()
@@ -276,55 +279,63 @@ def create_app(lecture_marker='ssbi25'):
         #     for task in existing_tasks - my_tasks:
         #         feedbacks[task] = existing_feedbacks[task]
         feedbacks_json = json.dumps(feedbacks)
-        cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?", 
+        cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?",
                         (feedbacks_json, team_name))
         conn.commit()
         conn.close()
 
         set_props('toast-save', {'is_open': True})
-        set_props('toast-save', {'children': html.Span([html.I(className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}) ,"Feedback saved successfully!"])})
+        set_props('toast-save',
+                  {'children': html.Span([html.I(className="fa-solid fa-square-check me-1",
+                                                 style={"color": "#63e6be"}), "Feedback saved successfully!"])})
         set_props(f'graded_{team_name}', {'className': 'fa-solid fa-check'})
 
     @dash_app.callback(Input('modal-view', 'is_open'),
-            Input({'type': 'penalty-input', 'index': ALL}, 'value'),
-            State({'type': 'comment-input', 'index': ALL}, 'id'),
-            State('assignment-select', 'value'))
+                       Input({'type': 'penalty-input', 'index': ALL}, 'value'),
+                       State({'type': 'comment-input', 'index': ALL}, 'id'),
+                       State('assignment-select', 'value'))
     def update_score(ready_to_update, penalties, tasks, assignment):
-        """Update the scores in the grading view after changing the penalties"""
+        """
+        Update the scores in the grading view after changing the penalties
+        """
         if not ready_to_update:
             raise dash.exceptions.PreventUpdate
-        
+
         assignment_match = re.search(r'\d+$', assignment)
         assignment_id = int(assignment_match.group()) if assignment_match else None
-        per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
+        per_task_scores = read_config(os.path.join('ssbi25', 'config_ssbi25.txt'))['tasks'][assignment_id - 1]
 
-        penalties_gropued = {}
+        penalties_grouped = {}
         for task, penalty in zip(tasks, penalties):
             if not task: continue
             task_id = task['index']
             task = task_id.split('_')[0]
-            if task not in penalties_gropued:
-                penalties_gropued[task] = []
-            if type(penalty) == int:
-                penalties_gropued[task].append(penalty)
-        for task, penalty in penalties_gropued.items():
-            total_penalty = sum(penalties_gropued[task])
-            if total_penalty > 0: total_penalty = -total_penalty
-            score = int(per_task_scores[task]) + total_penalty
+            if task not in penalties_grouped:
+                penalties_grouped[task] = []
+            if type(penalty) in [int, float]:
+                penalties_grouped[task].append(penalty)
+        for task, penalty in penalties_grouped.items():
+            total_penalty = sum(penalties_grouped[task])
+            if total_penalty > 0:
+                total_penalty = -total_penalty
+            score = float(per_task_scores[task]) + total_penalty
+            if int(score) == float(score):
+                score = int(score)
             if score < 0:
                 score = 0
             if score > int(per_task_scores[task]):
                 score = int(per_task_scores[task])
             set_props({'type': 'per-task-total-score', 'index': task}, {'children': str(score)})
 
-
     @dash_app.callback(Input('upload-db', 'contents'),
-            Input('upload-db', 'filename'),
-            Input('upload-db', 'last_modified'),
-            State('assignment-select', 'value'),
-            prevent_initial_call=True)
+                       Input('upload-db', 'filename'),
+                       Input('upload-db', 'last_modified'),
+                       State('assignment-select', 'value'),
+                       prevent_initial_call=True)
     def merge_grading_from_other_tutors(content, name, last_modified, assignment):
-        """Merge grading from other tutors into the current database"""
+        """
+        Merge grading from other tutors into the current database
+        """
         content_type, content_string = content.split(',')
         decoded = base64.b64decode(content_string)
         name = name + 'new'
@@ -360,7 +371,7 @@ def create_app(lecture_marker='ssbi25'):
                         for task, comments in uploaded_grades.items():
                             local_grades[task] = comments
 
-                        cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?", 
+                        cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?",
                                     (json.dumps(local_grades), team))
                     except:
                         continue
@@ -368,11 +379,15 @@ def create_app(lecture_marker='ssbi25'):
             other_conn.close()
 
             set_props('toast-save', {'is_open': True})
-            set_props('toast-save', {'children': html.Span([html.I(className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}) ,"Grades from other tutors merged successfully!"])})
+            set_props('toast-save', {'children': html.Span([html.I(
+                className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
+                "Grades from other tutors merged successfully!"])})
             set_props('submission-list', {'children': get_submission_list(assignment)})
         except sqlite3.Error as e:
             set_props('toast-save', {'is_open': True})
-            set_props('toast-save', {'children': html.Span([html.I(className="fa-solid fa-square-xmark me-1", style={"color": "#ff3333"}) ,f"Error merging grades: {str(e)}"])})
+            set_props('toast-save', {'children': html.Span([html.I(
+                className="fa-solid fa-square-xmark me-1", style={"color": "#ff3333"}),
+                f"Error merging grades: {str(e)}"])})
         finally:
             # add connection close for second connection, in case sql operation failed without closing first
             try:
@@ -388,9 +403,9 @@ def create_app(lecture_marker='ssbi25'):
                 os.remove(name)
 
     @dash_app.callback(Output('downloader', 'data'),
-            Input('generate', 'n_clicks'),
-            State('assignment-select', 'value'),
-            prevent_initial_call=True)
+                       Input('generate', 'n_clicks'),
+                       State('assignment-select', 'value'),
+                       prevent_initial_call=True)
     def generate_feedback(generate, assignment):
         if not assignment:
             set_props('toast-save', {'is_open': True})
@@ -399,7 +414,7 @@ def create_app(lecture_marker='ssbi25'):
 
         assignment_match = re.search(r'\d+$', assignment)
         assignment_id = int(assignment_match.group()) if assignment_match else None
-        per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
+        per_task_scores = read_config(os.path.join('ssbi25', 'config_ssbi25.txt'))['tasks'][assignment_id - 1]
 
         os.makedirs('feedbacks', exist_ok=True)
         with app.app_context():
@@ -409,10 +424,13 @@ def create_app(lecture_marker='ssbi25'):
 
         for team, group in groups.groupby('Team'):
             members = group.reset_index(drop=True)
-            student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}" for student in members.iterrows()]
+            student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}" for student in
+                             members.iterrows()]
 
-            try: feedbacks = json.loads(members.at[0, 'Grade'])
-            except: feedbacks = {}
+            try:
+                feedbacks = json.loads(members.at[0, 'Grade'])
+            except:
+                feedbacks = {}
 
             overall_score = 0
             markdown_str = f"# Feedback on {assignment} for Team {team}\n\n"
@@ -426,39 +444,39 @@ def create_app(lecture_marker='ssbi25'):
                 # If the student has got full marks on this task
                 if task not in feedbacks.keys():
                     tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
-                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                # If the student has got penalties on this task
-                else:
-                    penalty_str = f"Penalties:\n\n"
+                tasks_str += f"Well done, you have got full marks on this task!\n\n"
+            # If the student has got penalties on this task
+            else:
+                penalty_str = f"Penalties:\n\n"
+                if task in feedbacks.keys():
                     for penalty, comment in feedbacks[task]:
                         if penalty is None:
                             if comment is None: continue
                             else: penalty = 0
-                        if penalty >= 0: penalty = -penalty
+                        if penalty >= 0:
+                            penalty = -penalty
                         penalty_str += f"- **{penalty}** points: {comment}\n\n"
                         remaining_points += penalty
-                    if remaining_points < 0: remaining_points = 0
+                    if remaining_points < 0:
+                        remaining_points = 0
 
-                    tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
-                    if remaining_points == int(max_points):
-                        tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                    else:
-                        tasks_str += penalty_str
-
-                overall_score += remaining_points
-
+                tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
+                if remaining_points == int(max_points):
+                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
+                else:
+                    tasks_str += penalty_str
+            overall_score += remaining_points
             markdown_str += f"Overall Score: **{overall_score}/100**\n\n"
             markdown_str += tasks_str
 
             lastnames = [student[1]['Last Name'] for student in members.iterrows()]
             with open(os.path.join('feedbacks', f"{team}_{'_'.join(lastnames)}.md"), 'w') as f:
                 f.write(markdown_str)
-
         # zip the files
         with zipfile.ZipFile(f"Feedbacks_{assignment}.zip", 'w') as zipf:
             for file in os.listdir('feedbacks'):
-                zipf.write(os.path.join('feedbacks', file), os.path.relpath(os.path.join('feedbacks', file), 'feedbacks'))
-
+                zipf.write(os.path.join('feedbacks', file),
+                           os.path.relpath(os.path.join('feedbacks', file), 'feedbacks'))
         # clean up
         with open(f"Feedbacks_{assignment}.zip", 'rb') as f:
             zip_byte = f.read()
@@ -466,8 +484,8 @@ def create_app(lecture_marker='ssbi25'):
         shutil.rmtree('feedbacks', ignore_errors=True)
 
         return dcc.send_bytes(zip_byte, f"Feedbacks_{assignment}.zip")
-
     return app
+
 
 if __name__ == '__main__':
     app = create_app('ssbi25')

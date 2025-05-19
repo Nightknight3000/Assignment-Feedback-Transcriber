@@ -1,8 +1,9 @@
 click
-pandas
-tabulate
 dash
-openpyxl
 dash-bootstrap-components
-selenium
+flask
+openpyxl
 rich
+pandas
+selenium
+tabulate
