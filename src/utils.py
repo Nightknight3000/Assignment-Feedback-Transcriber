@@ -10,10 +10,13 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import NoSuchElementException
 
 
 _GERMAN_LANGUAGE_CONSTANTS = {'Vorname': 'First Name',
-                              'Nachname': "Last Name"}
+                              'Nachname': 'Last Name',
+                              'Evaluation by File': 'Rückmeldung per Datei',
+                              'back': 'zurück'}
 
 
 def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
@@ -103,7 +106,7 @@ def upload_to_ilias(feedback_dir) -> None:
     print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
     driver = webdriver.Edge()
     driver.get("https://ovidius.uni-tuebingen.de/")
-    print("Navigate to the Hands-in page and select the corresponsing assignment.")
+    print("Navigate to the Hands-in page and select the corresponding assignment.")
 
     # While waiting for the user
     per_team_feedbacks = {}
@@ -145,7 +148,12 @@ def upload_to_ilias(feedback_dir) -> None:
                         driver.implicitly_wait(1)
 
                         # Evaluation by File
-                        evaluation_button = row.find_element(By.XPATH, ".//button[contains(text(), 'Evaluation by File')]")
+                        try:
+                            evaluation_button = row.find_element(By.XPATH,
+                                                                 ".//button[contains(text(), 'Evaluation by File')]")
+                        except NoSuchElementException:
+                            evaluation_button = row.find_element(By.XPATH,
+                                                                 f".//button[contains(text(), '{_GERMAN_LANGUAGE_CONSTANTS['Evaluation by File']}')]")
                         try: evaluation_button.click()
                         except Exception: driver.execute_script("arguments[0].click();", evaluation_button)
                         driver.implicitly_wait(1)
@@ -160,12 +168,24 @@ def upload_to_ilias(feedback_dir) -> None:
                         )
 
                         # Return
-                        print(f"Successfully uploaded feedback for team {team_number}")
-                        driver.back()
+                        print(f"Successfully uploaded feedback for team {team_number}...", end='')
+                        # TODO: Find a proper way to return to the Handin page (driver.back() doesn't work) <<<<<
+                        try:
+                            back_button = row.find_element(By.XPATH,
+                                                           ".//button[contains(text(), 'back')]")
+                        except NoSuchElementException:
+                            back_button = row.find_element(By.XPATH,
+                                                           f".//button[contains(text(), '{_GERMAN_LANGUAGE_CONSTANTS['back']}')]")
+                        try: back_button.click()
+                        except Exception: driver.execute_script("arguments[0].click();", back_button)
+                        driver.implicitly_wait(1)
+                        # TODO: >>>>>
+
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
                         )
                         progress.advance(task)
+                        print("progressing")
                         break
 
                 except Exception as e:

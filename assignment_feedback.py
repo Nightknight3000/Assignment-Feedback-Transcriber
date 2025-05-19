@@ -1,6 +1,4 @@
-import os
 import click
-import pandas as pd
 from io import StringIO
 
 from src.web_server import create_app
