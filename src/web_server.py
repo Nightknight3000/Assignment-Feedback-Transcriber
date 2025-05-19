@@ -441,13 +441,6 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
                 remaining_points = int(max_points)
                 tasks_str += f"## Task {task}\n\n"
 
-                    # If the student has got full marks on this task
-                    if task not in feedbacks.keys():
-                        tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
-                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                # If the student has got penalties on this task
-                else:
-                    penalty_str = f"Penalties:\n\n"
                 # If the student has got full marks on this task
                 if task not in feedbacks.keys():
                     tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
@@ -455,6 +448,7 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
             # If the student has got penalties on this task
             else:
                 penalty_str = f"Penalties:\n\n"
+                if task in feedbacks.keys():
                     for penalty, comment in feedbacks[task]:
                         if penalty is None:
                             if comment is None: continue
