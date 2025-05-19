@@ -281,19 +281,22 @@ def update_score(ready_to_update, penalties, tasks, assignment):
     assignment_id = int(assignment_match.group()) if assignment_match else None
     per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
 
-    penalties_gropued = {}
+    penalties_grouped = {}
     for task, penalty in zip(tasks, penalties):
         if not task: continue
         task_id = task['index']
         task = task_id.split('_')[0]
-        if task not in penalties_gropued:
-            penalties_gropued[task] = []
-        if type(penalty) == int:
-            penalties_gropued[task].append(penalty)
-    for task, penalty in penalties_gropued.items():
-        total_penalty = sum(penalties_gropued[task])
-        if total_penalty > 0: total_penalty = -total_penalty
-        score = int(per_task_scores[task]) + total_penalty
+        if task not in penalties_grouped:
+            penalties_grouped[task] = []
+        if type(penalty) in [int, float]:
+            penalties_grouped[task].append(penalty)
+    for task, penalty in penalties_grouped.items():
+        total_penalty = sum(penalties_grouped[task])
+        if total_penalty > 0:
+            total_penalty = -total_penalty
+        score = float(per_task_scores[task]) + total_penalty
+        if int(score) == float(score):
+            score = int(score)
         if score < 0:
             score = 0
         if score > int(per_task_scores[task]):

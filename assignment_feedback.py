@@ -135,7 +135,6 @@ def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
-
 def read_config(config: str, lecture_marker: str = '') -> dict[str, list[str]]:
     assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": []}
     with open(config, 'r') as f:
@@ -171,6 +170,7 @@ def test_no_of_elements(lines: list[str], max_num: int) -> None:
                 print(line.split(','))
                 raise Exception(f"Error! Found {element_count}, not the expected {max_num}, number of elements in line "
                                 f"{i + 1} in your grading file.")
+
 
 def upload_to_ilias(feedback_dir) -> None:
     print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
@@ -243,6 +243,7 @@ def upload_to_ilias(feedback_dir) -> None:
 
                 except Exception as e:
                     print(f"Error processing row: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
