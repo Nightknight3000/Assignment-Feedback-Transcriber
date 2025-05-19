@@ -402,44 +402,44 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
             if os.path.exists(name):
                 os.remove(name)
 
-        @dash_app.callback(Output('downloader', 'data'),
-                           Input('generate', 'n_clicks'),
-                           State('assignment-select', 'value'),
-                           prevent_initial_call=True)
-        def generate_feedback(generate, assignment):
-            if not assignment:
-                set_props('toast-save', {'is_open': True})
-                set_props('toast-save', {'children': "You need to select an assignment!"})
-                return dash.no_update
+    @dash_app.callback(Output('downloader', 'data'),
+                       Input('generate', 'n_clicks'),
+                       State('assignment-select', 'value'),
+                       prevent_initial_call=True)
+    def generate_feedback(generate, assignment):
+        if not assignment:
+            set_props('toast-save', {'is_open': True})
+            set_props('toast-save', {'children': "You need to select an assignment!"})
+            return dash.no_update
 
-            assignment_match = re.search(r'\d+$', assignment)
-            assignment_id = int(assignment_match.group()) if assignment_match else None
-            per_task_scores = read_config(os.path.join('ssbi25', 'config_ssbi25.txt'))['tasks'][assignment_id - 1]
+        assignment_match = re.search(r'\d+$', assignment)
+        assignment_id = int(assignment_match.group()) if assignment_match else None
+        per_task_scores = read_config(os.path.join('ssbi25', 'config_ssbi25.txt'))['tasks'][assignment_id - 1]
 
-            os.makedirs('feedbacks', exist_ok=True)
-            with app.app_context():
-                conn = get_db()
-            groups = pd.read_sql_query(f"SELECT [First Name], [Last Name], Team, Grade FROM [{assignment}]", conn)
-            conn.close()
+        os.makedirs('feedbacks', exist_ok=True)
+        with app.app_context():
+            conn = get_db()
+        groups = pd.read_sql_query(f"SELECT [First Name], [Last Name], Team, Grade FROM [{assignment}]", conn)
+        conn.close()
 
-            for team, group in groups.groupby('Team'):
-                members = group.reset_index(drop=True)
-                student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}" for student in
-                                 members.iterrows()]
+        for team, group in groups.groupby('Team'):
+            members = group.reset_index(drop=True)
+            student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}" for student in
+                             members.iterrows()]
 
-                try:
-                    feedbacks = json.loads(members.at[0, 'Grade'])
-                except:
-                    feedbacks = {}
+            try:
+                feedbacks = json.loads(members.at[0, 'Grade'])
+            except:
+                feedbacks = {}
 
-                overall_score = 0
-                markdown_str = f"# Feedback on {assignment} for Team {team}\n\n"
-                markdown_str += f"Students: {', '.join(student_names)}\n\n"
+            overall_score = 0
+            markdown_str = f"# Feedback on {assignment} for Team {team}\n\n"
+            markdown_str += f"Students: {', '.join(student_names)}\n\n"
 
-                tasks_str = ''
-                for task, max_points in per_task_scores.items():
-                    remaining_points = int(max_points)
-                    tasks_str += f"## Task {task}\n\n"
+            tasks_str = ''
+            for task, max_points in per_task_scores.items():
+                remaining_points = int(max_points)
+                tasks_str += f"## Task {task}\n\n"
 
                     # If the student has got full marks on this task
                     if task not in feedbacks.keys():
@@ -448,6 +448,13 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
                 # If the student has got penalties on this task
                 else:
                     penalty_str = f"Penalties:\n\n"
+                # If the student has got full marks on this task
+                if task not in feedbacks.keys():
+                    tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
+                tasks_str += f"Well done, you have got full marks on this task!\n\n"
+            # If the student has got penalties on this task
+            else:
+                penalty_str = f"Penalties:\n\n"
                     for penalty, comment in feedbacks[task]:
                         if penalty is None:
                             if comment is None: continue
@@ -459,12 +466,12 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
                     if remaining_points < 0:
                         remaining_points = 0
 
-                    tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
-                    if remaining_points == int(max_points):
-                        tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                    else:
-                        tasks_str += penalty_str
-                overall_score += remaining_points
+                tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
+                if remaining_points == int(max_points):
+                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
+                else:
+                    tasks_str += penalty_str
+            overall_score += remaining_points
             markdown_str += f"Overall Score: **{overall_score}/100**\n\n"
             markdown_str += tasks_str
 
