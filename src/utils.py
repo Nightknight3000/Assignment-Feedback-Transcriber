@@ -30,6 +30,8 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
         conn = sqlite3.connect(sqlite_file)
         df.to_sql(table_name, conn, if_exists='append', index=False)
         print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
+        merged_df = rid_df_off_copy_rows(pd.read_sql_query(f"SELECT * FROM [{table_name}]", conn))
+        merged_df.to_sql(table_name, conn, if_exists='replace', index=False)
         conn.close()
     except FileNotFoundError:
         print(f"Could not find {xlsx_file}")
@@ -42,6 +44,23 @@ def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
         return df.rename(mapper=_GERMAN_LANGUAGE_CONSTANTS, axis=1)
     else:
         return df
+
+
+def rid_df_off_copy_rows(df: pd.DataFrame) -> pd.DataFrame:
+    drop_is = []
+    students = []
+    for i, row in df.iterrows():
+        student = (row['Last Name'], row['First Name'])
+        if student not in students:
+            students.append(student)
+    for student in students:
+        lname, fname = student
+        student_df = df[(df['Last Name'] == lname) & (df['First Name'] == fname)]
+        if student_df['Grade'].empty:
+            drop_is.extend(student_df.index[1:])
+        else:
+            drop_is.extend(student_df[~student_df.Grade.astype(bool)].index)
+    return df.drop(drop_is)
 
 
 def read_config(config: str) -> dict[str, list[str]]:
