@@ -28,7 +28,7 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
 
         table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
         conn = sqlite3.connect(sqlite_file)
-        df.to_sql(table_name, conn, if_exists='replace', index=False)
+        df.to_sql(table_name, conn, if_exists='append', index=False)
         print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
         conn.close()
     except FileNotFoundError:
@@ -44,8 +44,7 @@ def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
-
-def read_config(config: str, lecture_marker: str = '') -> dict[str, list[str]]:
+def read_config(config: str) -> dict[str, list[str]]:
     assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": []}
     with open(config, 'r') as f:
         lines = f.read().split('\n')
