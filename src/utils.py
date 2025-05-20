@@ -6,6 +6,7 @@ import sqlite3
 import pandas as pd
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 
+from urllib.parse import urlparse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -19,7 +20,7 @@ _GERMAN_LANGUAGE_CONSTANTS = {'Vorname': 'First Name',
                               'back': 'zurück'}
 
 
-def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
+def excel_to_sqlite(xlsx_file: str, db_connection) -> None:
     try:
         df = pd.read_excel(xlsx_file, engine='openpyxl')
         if 'Grade' not in df.columns:
@@ -29,18 +30,18 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
 
         # Swap from german to english
         df = translate_df_columns_to_english(df)
-
         table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
-        conn = sqlite3.connect(sqlite_file)
-        df.to_sql(table_name, conn, if_exists='append', index=False)
-        print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
-        merged_df = rid_df_off_copy_rows(pd.read_sql_query(f"SELECT * FROM [{table_name}]", conn))
-        merged_df.to_sql(table_name, conn, if_exists='replace', index=False)
-        conn.close()
+        df.to_sql(table_name, db_connection, if_exists='replace')
+        # merged_df = rid_df_off_copy_rows(pd.read_sql_query(f"SELECT * FROM [{table_name}]", db_connection))
+        # merged_df.to_sql(table_name, db_connection, if_exists='replace')
     except FileNotFoundError:
         print(f"Could not find {xlsx_file}")
+        return False
     except Exception as e:
         print(f"Error importing Excel to SQLite: {str(e)}")
+        return False
+    finally:
+        return True
 
 
 def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
@@ -107,6 +108,8 @@ def test_no_of_elements(lines: list[str], max_num: int) -> None:
 def upload_to_ilias(feedback_dir) -> None:
     print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
     driver = webdriver.Edge()
+    wait = WebDriverWait(driver, 20)
+
     driver.get("https://ovidius.uni-tuebingen.de/")
     print("Navigate to the Hands-in page and select the corresponding assignment.")
 
@@ -123,14 +126,12 @@ def upload_to_ilias(feedback_dir) -> None:
         task = progress.add_task("[green]Uploading feedbacks...", total=len(per_team_feedbacks))
         
         # Record the current URL for the RETURN functionality
-        teams_view_url = driver.current_url
+        teams_view_url = urlparse(driver.current_url)
+        teams_view_window = driver.current_window_handle
+        table = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "table-responsive")))
+        rows = table.find_elements(By.TAG_NAME, "tr")
 
         for team, feedback_file in per_team_feedbacks.items():
-            table = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
-            )
-            rows = table.find_elements(By.TAG_NAME, "tr")
-
             for row in rows[1:]:
                 # Find team name in small div with parentheses
                 try:
@@ -143,47 +144,38 @@ def upload_to_ilias(feedback_dir) -> None:
                         team_number = team_number.group(1)
                         if team != team_number: continue
 
-                        driver.execute_script("arguments[0].scrollIntoView(true);", row)
-                        driver.implicitly_wait(1)
-
-                        # Actions dropdown
-                        actions_cell = row.find_element(By.XPATH, ".//td[contains(.//div/@class, 'dropdown')]")
-                        dropdown_button = actions_cell.find_element(By.XPATH, ".//button[contains(@class, 'dropdown-toggle')]")
-                        try: dropdown_button.click()
-                        except Exception: driver.execute_script("arguments[0].click();", dropdown_button)
-                        driver.implicitly_wait(1)
-
-                        # Evaluation by File
                         try:
-                            evaluation_button = row.find_element(By.XPATH,
-                                                                 ".//button[contains(text(), 'Evaluation by File')]")
+                            button = row.find_element(By.XPATH, f".//button[normalize-space(text())='Evaluation by File']")
                         except NoSuchElementException:
-                            evaluation_button = row.find_element(By.XPATH,
-                                                                 f".//button[contains(text(), '{_GERMAN_LANGUAGE_CONSTANTS['Evaluation by File']}')]")
-                        try: evaluation_button.click()
-                        except Exception: driver.execute_script("arguments[0].click();", evaluation_button)
-                        driver.implicitly_wait(1)
+                            button = row.find_element(By.XPATH, f".//button[normalize-space(text())='{_GERMAN_LANGUAGE_CONSTANTS['Evaluation by File']}']")
+
+                        # open a new tab for uploading
+                        upload_page_data_action = urlparse(button.get_attribute('data-action'))
+                        upload_url = teams_view_url._replace(query=upload_page_data_action.query).geturl()
+                        driver.switch_to.new_window('tab')
+                        driver.get(upload_url)
+                        for window_handle in driver.window_handles:
+                            if window_handle != teams_view_window:
+                                driver.switch_to.window(window_handle)
+                                break
+                        wait.until(EC.presence_of_element_located((By.ID, "new_file")))
 
                         # Upload feedback file
                         file_input = driver.find_element(By.ID, "new_file")
                         file_input.send_keys(feedback_file)
                         upload_button = driver.find_element(By.XPATH, "//input[@type='submit' and @name='cmd[uploadFile]']")
                         upload_button.click()
-                        WebDriverWait(driver, 20).until(
-                            EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-success')] | //table[contains(@class, 'table-striped')]//a"))
-                        )
+                        wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-success')] | //table[contains(@class, 'table-striped')]//a")))
 
                         # Return
-                        print(f"Successfully uploaded feedback for team {team_number}...", end='')
-                        driver.get(teams_view_url)
-                        driver.implicitly_wait(1)
+                        driver.close()
+                        driver.switch_to.window(teams_view_window)
+                        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "table-responsive")))
 
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
-                        )
+                        print(f"Successfully uploaded feedback for team {team}...", end='')
                         progress.advance(task)
                         print("progressing")
                         break
 
                 except Exception as e:
-                    print(f"Error processing row: {str(e)}")
+                    print(f"Error processing {team}: {str(e)}")
