@@ -50,7 +50,7 @@ You may merge the gradings from your colleagues. Click `Merge Gradings` button o
 
 **Rule-of-thumb:** Always use the database with the most tables in it, and merge the rest into them (since merging a database with more tables won't add these). 
 
-After all the gradings for one assignment has been finished, click the `Generate Feedbacks` button to download the feedback files. You will get a `zip` file, unzip it afterwards. Now you can stop the web server and upload them to ILIAS. See [Automatic upload](?tab=readme-ov-file#automatic-upload).
+After all the gradings for one assignment has been finished, click the `Generate Feedbacks` button to download the feedback files. You will get a `zip` file, unzip it afterwards. Now you can stop the web server and upload them to ILIAS. See [Automatic upload](#automatic-upload).
 
 ### Manual Input - (Optional)
 If you wish to use the tool without the web server, you require multiple CSV-files, each associated with an assignment. 
