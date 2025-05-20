@@ -17,7 +17,7 @@ def main(lecture_marker, output_dir, config, feedback_dir, web_server):
             raise IOError(f"Feedback directory {feedback_dir} does not exist.")
         upload_to_ilias(feedback_dir)
     elif web_server:
-        app = create_app(lecture_marker, output_dir)
+        app = create_app(lecture_marker, output_dir, config)
         app.run(host='127.0.0.1', debug=False, port=8050)
     else:
       output_dir = output_dir + '/' if not output_dir.endswith('/') else output_dir

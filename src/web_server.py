@@ -14,7 +14,7 @@ from dash import (ALL, MATCH, Dash, Input, Output, Patch, State, ctx, dcc,
                   html, set_props)
 from flask import Flask, current_app, g
 
-from src.utils import read_config
+from src.utils import read_config, excel_to_sqlite
 
 
 def get_db():
@@ -28,11 +28,12 @@ def get_db():
     return g.db
 
 
-def create_app(lecture_marker='ssbi25', output_dir=''):
+def create_app(lecture_marker, output_dir, config):
     app = Flask(lecture_marker, instance_relative_config=True)
     app.config.from_mapping(
         DATABASE=os.path.join(output_dir, f'{lecture_marker}.sqlite3'),
         SECRET_KEY=secrets.token_hex(),
+        LECTURE_CONFIG=config
     )
     print(os.path.abspath(app.config['DATABASE']))
     print(f"Database path: {app.config['DATABASE']}")
@@ -46,28 +47,49 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
     assignment_list = [table['name'] for table in tables]
 
     dash_app = Dash(lecture_marker, server=app,
-            external_scripts=[{
-                'src': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js',
-                'integrity': 'sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm',
-                'crossorigin': 'anonymous'
-            }],
-            external_stylesheets=[{
-                'href': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css',
-                'integrity': 'sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9',
-                'crossorigin': 'anonymous',
-                'rel': 'stylesheet'
-            },
-            {
-                'href': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css',
-                'rel': 'stylesheet'
-            }],
-            suppress_callback_exceptions=True)
+        external_scripts=[{
+            'src': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js',
+            'integrity': 'sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm',
+            'crossorigin': 'anonymous'
+        }],
+        external_stylesheets=[{
+            'href': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css',
+            'integrity': 'sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9',
+            'crossorigin': 'anonymous',
+            'rel': 'stylesheet'
+        },
+        {
+            'href': 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css',
+            'rel': 'stylesheet'
+        }],
+        suppress_callback_exceptions=True)
 
     dash_app.layout = dbc.Container([
+        dcc.ConfirmDialog(id='confirm-overwrite'),
         dcc.Download(id="downloader"),
         dbc.Modal(id="modal-view", size="lg", is_open=False, backdrop="static", centered=True),
         dbc.Toast("", id="toast-save", header="Info", is_open=False, duration=3000,
                   style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
+        dbc.Row([
+            dbc.Col(html.H1("Assignment Feedback Transcriber"), className='text-center', width=12),
+            dbc.Col(html.H4(f"Currently running on lecture {lecture_marker}"), width=12),
+            dbc.Col(
+                dbc.Row([
+                    dbc.Col(
+                        dcc.Upload(
+                            html.Button('Add Assignment', className="btn btn-primary"),
+                            id='upload-ass',style={'textAlign': 'center'}
+                        ), width='auto'),
+                    dbc.Col(
+                        dcc.Upload(
+                            html.Button('Merge Gradings', className="btn btn-primary"),
+                            id='upload-db',style={'textAlign': 'center'}
+                        ), width='auto'),
+                ], className='justify-content-start'),
+            width=6),
+            dbc.Col(dbc.Button("Generate Feedbacks", id='generate', className="btn btn-primary", style={'width': '33%'}), width=6, className='d-flex justify-content-end'),
+            dbc.Col(html.Hr(), width=12)
+        ], className='mt-3 gy-3 justify-content-between'),
         dbc.Row([
             dbc.Col(html.Span("Select Assignment: ", className='h5'), width='auto'),
             dbc.Col([
@@ -78,13 +100,7 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
                     ],
                 ),
             ], className='col-2'),
-            dbc.Col(
-                dcc.Upload(
-                    html.Button('Upload grading from other tutors', className="btn btn-primary"),
-                    id='upload-db',style={'textAlign': 'center'}
-                ), width='auto'),
-            dbc.Col(dbc.Button("Generate Feedbacks", id='generate', className="btn btn-primary", style={'width': '95%'}), className='col-2 mx-auto'),
-        ], className='mt-3'),
+        ], className='mt-3 mb-2 align-items-center'),
         dbc.Row([
             dbc.Col([], id='submission-list', className='mx-auto'),
         ])
@@ -100,7 +116,7 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
 
         assignment_match = re.search(r'\d+$', assignment)
         assignment_id = int(assignment_match.group()) if assignment_match else None
-        per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_id-1]
+        per_task_scores = read_config(app.config['LECTURE_CONFIG'])['tasks'][assignment_id-1]
 
         # Check if 'Team' column exists
         if 'Team' in df.columns:
@@ -180,8 +196,8 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
         except sqlite3.Error as e:
             student_names = [f"Error loading students: {str(e)}"]
 
-        # Get the scores and names from config files (or database maybe?)
-        per_task_scores = read_config(os.path.join('ssbi25','config_ssbi25.txt'))['tasks'][assignment_num-1]
+        # Get scores from config files
+        per_task_scores = read_config(app.config['LECTURE_CONFIG'])['tasks'][assignment_num-1]
         try: grades = json.loads(students[0]['Grade'])
         except: grades = {}
         children = [
@@ -303,7 +319,7 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
 
         assignment_match = re.search(r'\d+$', assignment)
         assignment_id = int(assignment_match.group()) if assignment_match else None
-        per_task_scores = read_config(os.path.join('ssbi25', 'config_ssbi25.txt'))['tasks'][assignment_id - 1]
+        per_task_scores = read_config(app.config['LECTURE_CONFIG'])['tasks'][assignment_id - 1]
 
         penalties_grouped = {}
         for task, penalty in zip(tasks, penalties):
@@ -326,6 +342,68 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
             if score > int(per_task_scores[task]):
                 score = int(per_task_scores[task])
             set_props({'type': 'per-task-total-score', 'index': task}, {'children': str(score)})
+
+    @dash_app.callback(Input('upload-ass', 'contents'),
+                       Input('upload-ass', 'filename'),
+                       Input('upload-ass', 'last_modified'),
+                       prevent_initial_call=True)
+    def add_assignment(content, xlsx_name, last_modified):
+        """
+        Upload the xlsx file to add an assignment
+        """
+        if not xlsx_name.endswith('.xlsx'):
+            set_props('toast-save', {'is_open': True})
+            set_props('toast-save', {'children': html.Span([html.I(
+                className="fa-solid fa-square-xmark me-1", style={"color": "#ff3333"}),
+                f"Unsupported file type! Please upload xlsx files."])})
+        else:
+            content_type, content_string = content.split(',')
+            decoded = base64.b64decode(content_string)
+            with open(xlsx_name, 'wb') as f:
+                f.write(decoded)
+            with app.app_context():
+                conn = get_db()
+            table_name = os.path.splitext(os.path.basename(xlsx_name))[0]
+
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            # If table doesn't exist, create it
+            if not cursor.fetchone():
+                excel_to_sqlite(xlsx_name, app.config['DATABASE'])
+                set_props('toast-save', {'is_open': True})
+                set_props('toast-save', {'children': html.Span([html.I(
+                    className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
+                    f"{table_name} added successfully!"])})
+            # Otherwise, let the user determine whether to overwrite
+            else:
+                set_props('confirm-overwrite', {'displayed': True})
+                set_props('confirm-overwrite', {'message': f"\"{table_name}\" already exists! \n"+
+                                        "This is going to overwrite all your gradings. \n"+
+                                        "Are you sure to proceed?"})
+
+            if os.path.exists(xlsx_name):
+                os.remove(xlsx_name)
+
+    @dash_app.callback(Input('confirm-overwrite', 'submit_n_clicks'),
+                       State('upload-ass', 'contents'),
+                       State('upload-ass', 'filename'),
+                       prevent_initial_call=True)
+    def let_user_confirm_duplicate_action(proceed, content, xlsx_name):
+        content_type, content_string = content.split(',')
+        decoded = base64.b64decode(content_string)
+        with open(xlsx_name, 'wb') as f:
+            f.write(decoded)
+
+        table_name = os.path.splitext(os.path.basename(xlsx_name))[0]
+        excel_to_sqlite(xlsx_name, app.config['DATABASE'])
+        set_props('toast-save', {'is_open': True})
+        set_props('toast-save', {'children': html.Span([html.I(
+            className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
+            f"{table_name} updated successfully!"])})
+
+        if os.path.exists(xlsx_name):
+            os.remove(xlsx_name)
+
 
     @dash_app.callback(Input('upload-db', 'contents'),
                        Input('upload-db', 'filename'),
@@ -365,12 +443,15 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
 
                 if local_record:
                     try:
-                        uploaded_grades = json.loads(uploaded_grade)
-                        local_grades = json.loads(local_record['Grade']) if local_record['Grade'] else {}
+                        # In case the team have got full marks on all tasks
+                        try: uploaded_grades = json.loads(uploaded_grade)
+                        except: uploaded_grades = {}
+                        try: local_grades = json.loads(local_record['Grade'])
+                        except: local_grades = {}
 
+                        # Only update the records that have penalties
                         for task, comments in uploaded_grades.items():
                             local_grades[task] = comments
-
                         cursor.execute(f"UPDATE [{assignment}] SET Grade = ? WHERE Team = ?",
                                     (json.dumps(local_grades), team))
                     except:
@@ -414,7 +495,7 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
 
         assignment_match = re.search(r'\d+$', assignment)
         assignment_id = int(assignment_match.group()) if assignment_match else None
-        per_task_scores = read_config(os.path.join('ssbi25', 'config_ssbi25.txt'))['tasks'][assignment_id - 1]
+        per_task_scores = read_config(app.config['LECTURE_CONFIG'])['tasks'][assignment_id - 1]
 
         os.makedirs('feedbacks', exist_ok=True)
         with app.app_context():
@@ -488,5 +569,5 @@ def create_app(lecture_marker='ssbi25', output_dir=''):
 
 
 if __name__ == '__main__':
-    app = create_app('ssbi25')
+    app = create_app('ssbi25', 'ssbi25', os.path.join('ssbi25', 'config_ssbi25.txt'))
     app.run(host='127.0.0.1', debug=True, port=8050)

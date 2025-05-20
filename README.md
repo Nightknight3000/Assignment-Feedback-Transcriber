@@ -35,21 +35,22 @@ the tool.
 
 ## Input
 ### Input through Web service - (Recommended)
-Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the files path in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this:
+Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the tasks and their points for each assignment in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this to start the web server:
+
+```
+python3 assignment_feedback.py -l <lecture-marker> -o <directorypath> -c <filepath> -w
 ```
 
-python3 assignment_feedback.py -l <lecture-marker> -o <directorypath> -c <filepath>'
-```
-This will create a table for all xlsx specified in the configuration named `Assignment X` in a single database file named `<lecture-marker>.sqlite3`.
-Then launch the web server through (with `-l` and `-o`set with the same values as before):
-```
-python3 assignment_feedback.py -l <lecture-marker> -o <directorypath> -w
-```
-**Important**: Always utilize the most recently-created empty database to run your webserver, if there have been changes to the number of xlsx-files. This ensures that all tables for newer xlsx-files are set up.\\
-You may then merge older versions into it via the "Upload grading from other tutors"-button, to refill it with previous feedbacks.\\
-Likewise you may merge the gradings from your colleagues.\\
+This will create a database file named `<lecture-marker>.sqlite3` in `<directorypath>`.
+Then click `Add Assignment` button on the web server and upload `Assignment ?.xlsx`, which you obtained from ILIAS. 
 
-Rule-of-thumb: Always use the database with the most tables in it, and merge the rest into them (since merging a database with more tables won't add these). 
+**NOTE:** If the assignment already exists in the database, the system will prompt you whether to overwrite it.
+
+You may merge the gradings from your colleagues. Click `Merge Gradings` button on the webpage, then upload the `sqlite3` database file. then the incoming gradings for the current selected assignment will be merged. 
+
+**Rule-of-thumb:** Always use the database with the most tables in it, and merge the rest into them (since merging a database with more tables won't add these). 
+
+After all the gradings for one assignment has been finished, click the `Generate Feedbacks` button to download the feedback files. You will get a `zip` file, unzip it afterwards. Now you can stop the web server and upload them to ILIAS. See [Automatic upload](#automatic-upload).
 
 ### Manual Input - (Optional)
 If you wish to use the tool without the web server, you require multiple CSV-files, each associated with an assignment. 
@@ -88,16 +89,14 @@ Finally, this tool allows to automatically upload the resulting feedbacks onto I
 
 ## Example
 The webserver pipeline of this tool would look like this (requires specification of xlsx-files in config.txt):
-```
-# Setup database
-> python3 assignment_feedback.py -l ssbi25 -c config.txt
 
-# Run webserver utilizing the database
-> python3 assignment_feedback.py -l ssbi25 -w
+```
+# Setup database and start webserver
+> python3 assignment_feedback.py -l ssbi25 -o ssbi25 -c ssbi25/config_ssbi25.txt -w
 # TODO: Use GUI to input points and comments, then create feedback archive
 
 # Upload feedback to Ilias
-> python3 assignment_feedback.py -u feedback.zip
+> python3 assignment_feedback.py -u 'Feedbacks_Assignment 2'
 ```
 
 The manual pipeline for this tool would look like this (requires specification of csv-files containing points and comments in config.txt):

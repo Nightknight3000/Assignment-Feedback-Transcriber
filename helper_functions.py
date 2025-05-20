@@ -5,25 +5,20 @@ import sqlite3
 
 import pandas as pd
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import NoSuchElementException
 
 
 _GERMAN_LANGUAGE_CONSTANTS = {'Vorname': 'First Name',
-                              'Nachname': 'Last Name',
-                              'Evaluation by File': 'Rückmeldung per Datei',
-                              'back': 'zurück'}
+                              'Nachname': "Last Name"}
 
 
 def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
     try:
         df = pd.read_excel(xlsx_file, engine='openpyxl')
-        if 'Grade' not in df.columns:
-            df['Grade'] = ''
+        df['Grade'] = ''
         df.insert(0, 'id', range(1, len(df) + 1))
         df.set_index('id', inplace=True)
 
@@ -32,10 +27,8 @@ def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
 
         table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
         conn = sqlite3.connect(sqlite_file)
-        df.to_sql(table_name, conn, if_exists='append', index=False)
+        df.to_sql(table_name, conn, if_exists='replace', index=False)
         print(f"Successfully imported {xlsx_file} into {sqlite_file} as table '{table_name}'")
-        merged_df = rid_df_off_copy_rows(pd.read_sql_query(f"SELECT * FROM [{table_name}]", conn))
-        merged_df.to_sql(table_name, conn, if_exists='replace', index=False)
         conn.close()
     except FileNotFoundError:
         print(f"Could not find {xlsx_file}")
@@ -50,24 +43,8 @@ def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
-def rid_df_off_copy_rows(df: pd.DataFrame) -> pd.DataFrame:
-    drop_is = []
-    students = []
-    for i, row in df.iterrows():
-        student = (row['Last Name'], row['First Name'])
-        if student not in students:
-            students.append(student)
-    for student in students:
-        lname, fname = student
-        student_df = df[(df['Last Name'] == lname) & (df['First Name'] == fname)]
-        if student_df['Grade'].empty:
-            drop_is.extend(student_df.index[1:])
-        else:
-            drop_is.extend(student_df[~student_df.Grade.astype(bool)].index)
-    return df.drop(drop_is)
 
-
-def read_config(config: str) -> dict[str, list[str]]:
+def read_config(config: str, lecture_marker: str = '') -> dict[str, list[str]]:
     assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": []}
     with open(config, 'r') as f:
         lines = f.read().split('\n')
@@ -107,7 +84,7 @@ def upload_to_ilias(feedback_dir) -> None:
     print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
     driver = webdriver.Edge()
     driver.get("https://ovidius.uni-tuebingen.de/")
-    print("Navigate to the Hands-in page and select the corresponding assignment.")
+    print("Navigate to the Hands-in page and select the corresponsing assignment.")
 
     # While waiting for the user
     per_team_feedbacks = {}
@@ -120,10 +97,6 @@ def upload_to_ilias(feedback_dir) -> None:
                 BarColumn(),
                 MofNCompleteColumn()) as progress:
         task = progress.add_task("[green]Uploading feedbacks...", total=len(per_team_feedbacks))
-        
-        # Record the current URL for the RETURN functionality
-        teams_view_url = driver.current_url
-
         for team, feedback_file in per_team_feedbacks.items():
             table = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
@@ -153,12 +126,7 @@ def upload_to_ilias(feedback_dir) -> None:
                         driver.implicitly_wait(1)
 
                         # Evaluation by File
-                        try:
-                            evaluation_button = row.find_element(By.XPATH,
-                                                                 ".//button[contains(text(), 'Evaluation by File')]")
-                        except NoSuchElementException:
-                            evaluation_button = row.find_element(By.XPATH,
-                                                                 f".//button[contains(text(), '{_GERMAN_LANGUAGE_CONSTANTS['Evaluation by File']}')]")
+                        evaluation_button = row.find_element(By.XPATH, ".//button[contains(text(), 'Evaluation by File')]")
                         try: evaluation_button.click()
                         except Exception: driver.execute_script("arguments[0].click();", evaluation_button)
                         driver.implicitly_wait(1)
@@ -173,15 +141,12 @@ def upload_to_ilias(feedback_dir) -> None:
                         )
 
                         # Return
-                        print(f"Successfully uploaded feedback for team {team_number}...", end='')
-                        driver.get(teams_view_url)
-                        driver.implicitly_wait(1)
-
+                        print(f"Successfully uploaded feedback for team {team_number}")
+                        driver.back()
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
                         )
                         progress.advance(task)
-                        print("progressing")
                         break
 
                 except Exception as e:
