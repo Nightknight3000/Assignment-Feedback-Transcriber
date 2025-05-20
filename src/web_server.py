@@ -251,8 +251,8 @@ def create_app(lecture_marker, output_dir, config):
         return dbc.Row([
             dbc.Col(dbc.Button("❌", color='warning', id={'type': 'remove-comment', 'index': index}), width=1, className='mt-1'),
             dbc.Col(dbc.Input(type='number', placeholder='Penalty', id={'type': 'penalty-input', 'index': index}, value=penalty), width=3, className='mt-1'),
-            dbc.Col(dbc.Input(type='text', placeholder='Comment', id={'type': 'comment-input', 'index': index}, value=comment), width=8, className='mt-1'),
-        ], id={'type': 'comment-row', 'index': index})
+            dbc.Col(dbc.Textarea(placeholder='Comment', id={'type': 'comment-input', 'index': index}, value=comment), width=8, className='mt-1'),
+        ], id={'type': 'comment-row', 'index': index}, className='align-items-center')
 
     @dash_app.callback(Output({'type': 'comment-row', 'index': MATCH}, 'children'),
             Input({'type': 'remove-comment', 'index': MATCH}, 'n_clicks'),
@@ -369,11 +369,22 @@ def create_app(lecture_marker, output_dir, config):
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
             # If table doesn't exist, create it
             if not cursor.fetchone():
-                excel_to_sqlite(xlsx_name, app.config['DATABASE'])
-                set_props('toast-save', {'is_open': True})
-                set_props('toast-save', {'children': html.Span([html.I(
-                    className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
-                    f"{table_name} added successfully!"])})
+                if excel_to_sqlite(xlsx_name, conn):
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                    tables = cursor.fetchall()
+                    assignment_list = [table['name'] for table in tables]
+                    set_props('toast-save', {'is_open': True})
+                    set_props('toast-save', {'children': html.Span([html.I(
+                        className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
+                        f"{table_name} added successfully!"])})
+                    set_props('assignment-select', {'options': [{"label": assignment, "value": assignment} for assignment in assignment_list]})
+                else:
+                    set_props('toast-save', {'is_open': True})
+                    set_props('toast-save', {'children': html.Span([html.I(
+                        className="fa-solid fa-square-xmark me-1", style={"color": "#ff3333"}),
+                        f"Upload failed! Please check the log."])})
+
             # Otherwise, let the user determine whether to overwrite
             else:
                 set_props('confirm-overwrite', {'displayed': True})
@@ -394,12 +405,19 @@ def create_app(lecture_marker, output_dir, config):
         with open(xlsx_name, 'wb') as f:
             f.write(decoded)
 
+        with app.app_context():
+            conn = get_db()
         table_name = os.path.splitext(os.path.basename(xlsx_name))[0]
-        excel_to_sqlite(xlsx_name, app.config['DATABASE'])
-        set_props('toast-save', {'is_open': True})
-        set_props('toast-save', {'children': html.Span([html.I(
-            className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
-            f"{table_name} updated successfully!"])})
+        if excel_to_sqlite(xlsx_name, conn):
+            set_props('toast-save', {'is_open': True})
+            set_props('toast-save', {'children': html.Span([html.I(
+                className="fa-solid fa-square-check me-1", style={"color": "#63e6be"}),
+                f"{table_name} updated successfully!"])})
+        else:
+            set_props('toast-save', {'is_open': True})
+            set_props('toast-save', {'children': html.Span([html.I(
+                className="fa-solid fa-square-xmark me-1", style={"color": "#ff3333"}),
+                f"Update failed! Please check the log."])})
 
         if os.path.exists(xlsx_name):
             os.remove(xlsx_name)
@@ -518,22 +536,17 @@ def create_app(lecture_marker, output_dir, config):
             markdown_str += f"Students: {', '.join(student_names)}\n\n"
 
             tasks_str = ''
+            # Iterate through each task
             for task, max_points in per_task_scores.items():
                 remaining_points = int(max_points)
-                tasks_str += f"## Task {task}\n\n"
 
-                # If the student has got full marks on this task
-                if task not in feedbacks.keys():
-                    tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
-                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                # If the student has got penalties on this task
-                else:
-                    penalty_str = f"Penalties:\n\n"
+                # Calculate the remaining points and update the comments
+                penalty_str = "Penalties:\n\n"
                 if task in feedbacks.keys():
                     for penalty, comment in feedbacks[task]:
                         if penalty is None:
-                            if comment is None: continue
-                            else: penalty = 0
+                            if comment is None: continue    # Empty comment line
+                            else: penalty = 0               # Comment with no penalty
                         if penalty >= 0:
                             penalty = -penalty
                         penalty_str += f"- **{penalty}** points: {comment}\n\n"
@@ -541,12 +554,20 @@ def create_app(lecture_marker, output_dir, config):
                     if remaining_points < 0:
                         remaining_points = 0
 
-                    tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
-                    if remaining_points == int(max_points):
-                        tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                    else:
+                tasks_str += f"## Task {task}\n\n"
+                tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
+
+                # Determine the displayed message based on the remaining points
+                if remaining_points == int(max_points):
+                    # In case the student has got full marks on this task,
+                    # but the tutor still wants to leave a comment
+                    if len(penalty_str) > 12:
                         tasks_str += penalty_str
+                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
+                else:
+                    tasks_str += penalty_str
                 overall_score += remaining_points
+
             markdown_str += f"Overall Score: **{overall_score}/100**\n\n"
             markdown_str += tasks_str
 
