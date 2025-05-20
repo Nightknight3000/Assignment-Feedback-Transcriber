@@ -163,7 +163,7 @@ def upload_to_ilias(feedback_dir) -> None:
                         file_input = driver.find_element(By.ID, "new_file")
                         file_input.send_keys(feedback_file)
                         upload_button = driver.find_element(By.XPATH, "//input[@type='submit' and @name='cmd[uploadFile]']")
-                        # upload_button.click()
+                        upload_button.click()
                         wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-success')] | //table[contains(@class, 'table-striped')]//a")))
 
                         # Return
