@@ -22,7 +22,8 @@ _GERMAN_LANGUAGE_CONSTANTS = {'Vorname': 'First Name',
 def excel_to_sqlite(xlsx_file: str, sqlite_file: str) -> None:
     try:
         df = pd.read_excel(xlsx_file, engine='openpyxl')
-        df['Grade'] = ''
+        if 'Grade' not in df.columns:
+            df['Grade'] = ''
         df.insert(0, 'id', range(1, len(df) + 1))
         df.set_index('id', inplace=True)
 
@@ -119,6 +120,10 @@ def upload_to_ilias(feedback_dir) -> None:
                 BarColumn(),
                 MofNCompleteColumn()) as progress:
         task = progress.add_task("[green]Uploading feedbacks...", total=len(per_team_feedbacks))
+        
+        # Record the current URL for the RETURN functionality
+        teams_view_url = driver.current_url
+
         for team, feedback_file in per_team_feedbacks.items():
             table = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
@@ -169,17 +174,8 @@ def upload_to_ilias(feedback_dir) -> None:
 
                         # Return
                         print(f"Successfully uploaded feedback for team {team_number}...", end='')
-                        # TODO: Find a proper way to return to the Handin page (driver.back() doesn't work) <<<<<
-                        try:
-                            back_button = row.find_element(By.XPATH,
-                                                           ".//button[contains(text(), 'back')]")
-                        except NoSuchElementException:
-                            back_button = row.find_element(By.XPATH,
-                                                           f".//button[contains(text(), '{_GERMAN_LANGUAGE_CONSTANTS['back']}')]")
-                        try: back_button.click()
-                        except Exception: driver.execute_script("arguments[0].click();", back_button)
+                        driver.get(teams_view_url)
                         driver.implicitly_wait(1)
-                        # TODO: >>>>>
 
                         WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.CLASS_NAME, "table-responsive"))
