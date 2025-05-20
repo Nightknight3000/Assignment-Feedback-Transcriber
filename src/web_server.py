@@ -173,7 +173,7 @@ def create_app(lecture_marker, output_dir, config):
             prevent_initial_call=True)
     def open_grading_modal(yes, assignment):
         for y in yes:
-            if y != None:
+            if y is not None:
                 break
         else:
             raise dash.exceptions.PreventUpdate
@@ -505,8 +505,8 @@ def create_app(lecture_marker, output_dir, config):
 
         for team, group in groups.groupby('Team'):
             members = group.reset_index(drop=True)
-            student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}" for student in
-                             members.iterrows()]
+            student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}"
+                             for student in members.iterrows()]
 
             try:
                 feedbacks = json.loads(members.at[0, 'Grade'])
@@ -525,10 +525,10 @@ def create_app(lecture_marker, output_dir, config):
                 # If the student has got full marks on this task
                 if task not in feedbacks.keys():
                     tasks_str += f"Points reached: **{max_points}/{max_points}**.\n\n"
-                tasks_str += f"Well done, you have got full marks on this task!\n\n"
-            # If the student has got penalties on this task
-            else:
-                penalty_str = f"Penalties:\n\n"
+                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
+                # If the student has got penalties on this task
+                else:
+                    penalty_str = f"Penalties:\n\n"
                 if task in feedbacks.keys():
                     for penalty, comment in feedbacks[task]:
                         if penalty is None:
@@ -541,12 +541,12 @@ def create_app(lecture_marker, output_dir, config):
                     if remaining_points < 0:
                         remaining_points = 0
 
-                tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
-                if remaining_points == int(max_points):
-                    tasks_str += f"Well done, you have got full marks on this task!\n\n"
-                else:
-                    tasks_str += penalty_str
-            overall_score += remaining_points
+                    tasks_str += f"Points reached: **{remaining_points}/{max_points}**.\n\n"
+                    if remaining_points == int(max_points):
+                        tasks_str += f"Well done, you have got full marks on this task!\n\n"
+                    else:
+                        tasks_str += penalty_str
+                overall_score += remaining_points
             markdown_str += f"Overall Score: **{overall_score}/100**\n\n"
             markdown_str += tasks_str
 
