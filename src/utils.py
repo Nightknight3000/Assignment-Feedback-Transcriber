@@ -61,10 +61,11 @@ def rid_df_off_copy_rows(df: pd.DataFrame) -> pd.DataFrame:
     for student in students:
         lname, fname = student
         student_df = df[(df['Last Name'] == lname) & (df['First Name'] == fname)]
-        if student_df['Grade'].empty:
-            drop_is.extend(student_df.index[1:])
-        else:
-            drop_is.extend(student_df[~student_df.Grade.astype(bool)].index)
+        if len(student_df.index) > 1:
+            if all(~student_df.Grade.astype(bool)):
+                drop_is.extend(student_df.index[1:])
+            else:
+                drop_is.extend(student_df[~student_df.Grade.astype(bool)].index)
     return df.drop(drop_is)
 
 
