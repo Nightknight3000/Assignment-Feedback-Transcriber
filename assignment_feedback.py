@@ -1,4 +1,5 @@
 import click
+import sqlite3
 from io import StringIO
 
 from src.web_server import create_app
@@ -35,12 +36,16 @@ def main(lecture_marker, output_dir, config, feedback_dir, web_server):
               print(f"No path specified for Ilias assignment excel for assignment no.{assignment_no}.\n"
                     f"Skipping database table creation.")
 
-          # If Ilias Assignment excel was given, attempt to create database
-          if assignment_xlsx:
-              try:
-                  excel_to_sqlite(assignment_xlsx, output_dir + database_name)
-              except ValueError:
-                  print("Error: Database option format must be 'xlsx_file:sqlite_file'")
+            # If Ilias Assignment excel was given, attempt to create database
+            if assignment_xlsx:
+                try:
+                    sqlite_filepath = output_dir + database_name
+                    conn = sqlite3.connect(sqlite_filepath)
+                    _ = excel_to_sqlite(assignment_xlsx, conn, True)
+                    conn.close()
+                    pass
+                except ValueError:
+                    print("Error: Database option format must be 'xlsx_file:sqlite_file'")
 
           empty_table_str = "task,points_reached,points_max,comment\n"
           for task, max_points in tasks_and_max_points.items():
