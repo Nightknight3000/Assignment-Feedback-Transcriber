@@ -1,7 +1,7 @@
 import ast
 import os
 import re
-import sqlite3
+import time
 
 import pandas as pd
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
@@ -95,7 +95,7 @@ def test_no_of_elements(lines: list[str], max_num: int) -> None:
 
 def upload_to_ilias(feedback_dir) -> None:
     print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
-    driver = webdriver.Edge()
+    driver = webdriver.Chrome()
     wait = WebDriverWait(driver, 20)
 
     driver.get("https://ovidius.uni-tuebingen.de/")
@@ -153,6 +153,7 @@ def upload_to_ilias(feedback_dir) -> None:
                         file_input.send_keys(feedback_file)
                         upload_button = driver.find_element(By.XPATH, "//input[@type='submit' and @name='cmd[uploadFile]']")
                         upload_button.click()
+                        time.sleep(1)
                         wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-success')] | //table[contains(@class, 'table-striped')]//a")))
 
                         # Return
