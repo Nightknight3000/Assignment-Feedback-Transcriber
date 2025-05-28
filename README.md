@@ -23,13 +23,14 @@ pip install -r requirements.txt
 or individually:
 ```
 pip install click
-pip install pandas
-pip install tabulate
 pip install dash
-pip install openpyxl
 pip install dash-bootstrap-components
-pip install selenium
+pip install flask
+pip install openpyxl
 pip install rich
+pip install pandas
+pip install selenium
+pip install tabulate
 ```
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.
@@ -39,7 +40,7 @@ the tool.
 Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the tasks and their points for each assignment in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this to start the web server:
 
 ```
-python3 assignment_feedback.py -m websever -l <lecture-marker> -o <directorypath> -c <filepath>
+> python3 assignment_feedback.py -m websever -l <lecture-marker> -o <directorypath> -c <filepath>
 ```
 
 This will create a database file named `-l <lecture-marker>.sqlite3` in `-o <directorypath>`.
