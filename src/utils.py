@@ -57,7 +57,7 @@ def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def read_config(config: str) -> dict[str, list[str]]:
-    assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": []}
+    assignments = {"nums": [], "files": [], "tasks": []}#, "ass_xl": []}
     with open(config, 'r') as f:
         lines = f.read().split('\n')
         for line in lines:
@@ -68,8 +68,8 @@ def read_config(config: str) -> dict[str, list[str]]:
                 assignments["files"].append(line.replace('filepath=', ''))
             elif line.startswith('max_points='):
                 assignments["tasks"].append(ast.literal_eval(line.replace('max_points=', '')))
-            elif line.startswith('assignment_xlsx='):
-                assignments["ass_xl"].append(line.replace('assignment_xlsx=', ''))
+            # elif line.startswith('assignment_xlsx='):
+            #     assignments["ass_xl"].append(line.replace('assignment_xlsx=', ''))
     if len(assignments["nums"]) != len(assignments["files"]) != len(assignments["tasks"]):
         raise IOError("Configuration must contain equal number of assignment numbers, filepaths, and max_points.")
     return assignments
