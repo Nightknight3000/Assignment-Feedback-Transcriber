@@ -48,11 +48,15 @@ Then click `Add Assignment` button on the web server and upload `Assignment ?.xl
 
 **NOTE:** If the assignment already exists in the database, the system will prompt you whether to overwrite it.
 
-You may merge the gradings from your colleagues. Click `Merge Gradings` button on the webpage, then upload the `sqlite3` database file. then the incoming gradings for the current selected assignment will be merged. 
+You may merge the gradings from your colleagues. Click `Merge Gradings` button on the webpage, then upload the `sqlite3` database file. 
+This will (only) merge (=> overwrite) the incoming gradings for the currently selected assignment! 
+It is thereby also only possible for existing tables, i.e. it is not advised to attempt to merge assignment tables that don't exist in the active webserver instance yet.
+In this case one may either use the other database as basis for the webserver and merge what's needed of the current database into it,
+or create a new empty table in the current database as a foundation using a ``Assignment ?.xslsx``-file.
 
-**Rule-of-thumb:** Always use the database with the most tables in it, and merge the rest into them (since merging a database with more tables won't add these). 
-
-After all the gradings for one assignment have been finished, click the `Generate Feedbacks` button to download the feedback files. You will get a `zip` file for unpacking. Now you can stop the web server and upload them to ILIAS. See [Automatic upload](#automatic-upload).
+After all the gradings for one assignment have been finished, click the `Generate Feedbacks` button to download the feedback files.
+You will receive a `zip` file containing transcribed feedback Markdown-files for each team submission.
+Now you can stop the web server and upload the feedback files to ILIAS. See [Automatic upload](#automatic-upload).
 
 ### Manual Input through legacy mode - (Optional)
 If you wish to use the tool without the web server, you require multiple CSV-files, each associated with an assignment. 
@@ -88,9 +92,9 @@ For this to work, the feedback files in the specified directory should contain t
 ## Example
 The webserver pipeline of this tool could look like this:
 ```
-# Start webserver and setup database in outputdirectory (here='outs')
+# Start webserver and setup database in outputdirectory (here: 'outs')
 > python3 assignment_feedback.py -l lecture -o outs -c lecture_config.txt
-# TODO: Use GUI to load xlsx-files downloaded form Ilias, input points and comments, then create and unpack feedback archive.
+# TODO: Use GUI to load xlsx-files downloaded from Ilias, input points and comments, then create and unpack feedback archive.
 
 # Upload feedback to Ilias by specifying the unpacked directory
 > python3 assignment_feedback.py -m feedback -u 'Feedbacks_Assignment X'
@@ -100,7 +104,7 @@ The legacy pipeline for this tool could look like this (requires specification o
 ```
 # For legacy usage
 > python3 assignment_feedback.py -m legacy -l lecture -o outs -c lecture_config.txt
-# TODO: Manually add team id to created output feedback file's names as prefix.
+# TODO: Manually add team id to created output feedback file's names as prefix!
 
 # Upload feedback to Ilias by specifying the renamed feedbacks' directory
 > python3 assignment_feedback.py -m feedback -u 'outs/assX'
