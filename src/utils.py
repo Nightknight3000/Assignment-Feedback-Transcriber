@@ -1,7 +1,7 @@
 import ast
 import os
 import re
-import sqlite3
+import time
 
 import pandas as pd
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
@@ -20,7 +20,7 @@ _GERMAN_LANGUAGE_CONSTANTS = {'Vorname': 'First Name',
                               'back': 'zurück'}
 
 
-def excel_to_sqlite(xlsx_file: str, db_connection) -> None:
+def excel_to_sqlite(xlsx_file: str, db_connection, is_blank: bool = False) -> bool:
     try:
         df = pd.read_excel(xlsx_file, engine='openpyxl')
         if 'Grade' not in df.columns:
@@ -31,9 +31,14 @@ def excel_to_sqlite(xlsx_file: str, db_connection) -> None:
         # Swap from german to english
         df = translate_df_columns_to_english(df)
         table_name = os.path.splitext(os.path.basename(xlsx_file))[0]
-        df.to_sql(table_name, db_connection, if_exists='replace')
-        # merged_df = rid_df_off_copy_rows(pd.read_sql_query(f"SELECT * FROM [{table_name}]", db_connection))
-        # merged_df.to_sql(table_name, db_connection, if_exists='replace')
+        if is_blank:
+            # If new tables are added, drop new blank table if identically named one already exists
+            try:
+                df.to_sql(table_name, db_connection, if_exists='fail')
+            except ValueError:
+                pass
+        else:
+            df.to_sql(table_name, db_connection, if_exists='replace')
     except FileNotFoundError:
         print(f"Could not find {xlsx_file}")
         return False
@@ -51,26 +56,8 @@ def translate_df_columns_to_english(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
-def rid_df_off_copy_rows(df: pd.DataFrame) -> pd.DataFrame:
-    drop_is = []
-    students = []
-    for i, row in df.iterrows():
-        student = (row['Last Name'], row['First Name'])
-        if student not in students:
-            students.append(student)
-    for student in students:
-        lname, fname = student
-        student_df = df[(df['Last Name'] == lname) & (df['First Name'] == fname)]
-        if len(student_df.index) > 1:
-            if all(~student_df.Grade.astype(bool)):
-                drop_is.extend(student_df.index[1:])
-            else:
-                drop_is.extend(student_df[~student_df.Grade.astype(bool)].index)
-    return df.drop(drop_is)
-
-
 def read_config(config: str) -> dict[str, list[str]]:
-    assignments = {"nums": [], "files": [], "tasks": [], "ass_xl": []}
+    assignments = {"nums": [], "files": [], "tasks": []}#, "ass_xl": []}
     with open(config, 'r') as f:
         lines = f.read().split('\n')
         for line in lines:
@@ -81,8 +68,8 @@ def read_config(config: str) -> dict[str, list[str]]:
                 assignments["files"].append(line.replace('filepath=', ''))
             elif line.startswith('max_points='):
                 assignments["tasks"].append(ast.literal_eval(line.replace('max_points=', '')))
-            elif line.startswith('assignment_xlsx='):
-                assignments["ass_xl"].append(line.replace('assignment_xlsx=', ''))
+            # elif line.startswith('assignment_xlsx='):
+            #     assignments["ass_xl"].append(line.replace('assignment_xlsx=', ''))
     if len(assignments["nums"]) != len(assignments["files"]) != len(assignments["tasks"]):
         raise IOError("Configuration must contain equal number of assignment numbers, filepaths, and max_points.")
     return assignments
@@ -105,9 +92,10 @@ def test_no_of_elements(lines: list[str], max_num: int) -> None:
                 raise Exception(f"Error! Found {element_count}, not the expected {max_num}, number of elements in line "
                                 f"{i + 1} in your grading file.")
 
+
 def upload_to_ilias(feedback_dir) -> None:
     print("Now the browser should open. Please log in to ILIAS and navigate to the course page.")
-    driver = webdriver.Edge()
+    driver = webdriver.Chrome()
     wait = WebDriverWait(driver, 20)
 
     driver.get("https://ovidius.uni-tuebingen.de/")
@@ -165,6 +153,7 @@ def upload_to_ilias(feedback_dir) -> None:
                         file_input.send_keys(feedback_file)
                         upload_button = driver.find_element(By.XPATH, "//input[@type='submit' and @name='cmd[uploadFile]']")
                         upload_button.click()
+                        time.sleep(1)
                         wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'alert-success')] | //table[contains(@class, 'table-striped')]//a")))
 
                         # Return

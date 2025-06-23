@@ -7,13 +7,14 @@ It has the following requirements:
 
 Packages:
 * click
-* pandas
-* tabulate
 * dash
-* openpyxl
 * dash-bootstrap-components
-* selenium
+* flask
+* openpyxl
 * rich
+* pandas
+* selenium
+* tabulate
 
 The packages may be installed all at once with the file [requirements.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/requirements.txt):
 ```
@@ -22,13 +23,14 @@ pip install -r requirements.txt
 or individually:
 ```
 pip install click
-pip install pandas
-pip install tabulate
 pip install dash
-pip install openpyxl
 pip install dash-bootstrap-components
-pip install selenium
+pip install flask
+pip install openpyxl
 pip install rich
+pip install pandas
+pip install selenium
+pip install tabulate
 ```
 Note: Both approaches need to refer to the pip-installer associated to the python installation, that will be used to run
 the tool.
@@ -38,31 +40,31 @@ the tool.
 Download all submissions from ILIAS (**Please make sure your language setting of ILIAS is English or Deutsch**). An `xlsx` file will also be created. Specify the tasks and their points for each assignment in your config (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)), and run the script like this to start the web server:
 
 ```
-python3 assignment_feedback.py -l <lecture-marker> -o <directorypath> -c <filepath> -w
+> python3 assignment_feedback.py -m websever -l <lecture-marker> -o <directorypath> -c <filepath>
 ```
 
-This will create a database file named `<lecture-marker>.sqlite3` in `<directorypath>`.
+This will create a database file named `-l <lecture-marker>.sqlite3` in `-o <directorypath>`.
 Then click `Add Assignment` button on the web server and upload `Assignment ?.xlsx`, which you obtained from ILIAS. 
 
 **NOTE:** If the assignment already exists in the database, the system will prompt you whether to overwrite it.
 
-You may merge the gradings from your colleagues. Click `Merge Gradings` button on the webpage, then upload the `sqlite3` database file. then the incoming gradings for the current selected assignment will be merged. 
+You may merge the gradings from your colleagues. Click `Merge Gradings` button on the webpage, then upload the `sqlite3` database file. 
+This will (only) merge (=> overwrite) the incoming gradings for the currently selected assignment! 
+It is thereby also only possible for existing tables, i.e. it is not advised to attempt to merge assignment tables that don't exist in the active webserver instance yet.
+In this case one may either use the other database as basis for the webserver and merge what's needed of the current database into it,
+or create a new empty table in the current database as a foundation using a ``Assignment ?.xslsx``-file.
 
-**Rule-of-thumb:** Always use the database with the most tables in it, and merge the rest into them (since merging a database with more tables won't add these). 
+After all the gradings for one assignment have been finished, click the `Generate Feedbacks` button to download the feedback files.
+You will receive a `zip` file containing transcribed feedback Markdown-files for each team submission.
+Now you can stop the web server and upload the feedback files to ILIAS. See [Automatic upload](#automatic-upload).
 
-After all the gradings for one assignment has been finished, click the `Generate Feedbacks` button to download the feedback files. You will get a `zip` file, unzip it afterwards. Now you can stop the web server and upload them to ILIAS. See [Automatic upload](#automatic-upload).
-
-### Manual Input - (Optional)
+### Manual Input through legacy mode - (Optional)
 If you wish to use the tool without the web server, you require multiple CSV-files, each associated with an assignment. 
 The CSV-files should each contain the reached points as well as the associated feedback of each task (see example: [example/grading_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/grading_example.txt)).
-#### The CLI - Command Line Interface
 ```
-> python3 assignment_feedback.py [-l <str>] [-o <directorypath>] [-c <filepath>]
- 
--l,    --lecture-marker,        string-marker to be added to output filenames, default="ssbi25"
--o,    --output-directory,      output directory for produced subdirectories and assignment feedbacks, default="example"
--c,    --config,                filepath to configuration file containing all specifications of the assignments, default='example/config_example.txt'
+> python3 assignment_feedback.py -m legacy -l <lecture-marker> -o <directorypath> -c <filepath>
 ```
+#### Input CSV Formatting
 The provided information on points and feedback should be split by a comma and each surrounded by quotation-marks (to allow for the use of regular comma without breaking the format):
 * List of all group members: \
   ``"<member_1>,<member_2>,<member_X>"``
@@ -78,31 +80,34 @@ The enumeration, the paths, and the maximum reachable points of each task need t
 configuration file (see example: [example/config_example.txt](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/config_example.txt)).
 
 ## Output
-This tool returns all created feedbacks for the given assignments in Markdown format (see example: [example/ass1](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/ass1)). 
+This tool returns all created feedbacks for the given assignments in Markdown format (see example (for legacy mode): [example/ass1](https://github.com/Nightknight3000/Assignment-Feedback-Transcriber/blob/main/example/ass1)). 
 
 ## Automatic upload
 Finally, this tool allows to automatically upload the resulting feedbacks onto Ilias, by running:
 ```
-> python3 assignment_feedback.py -u <path to directory containing the feedbacks>
+> python3 assignment_feedback.py -m feedback -u <feedback directorypath>
 ```
-**Note:** Running the script with this argument fully changes its mode of operation, i.e. it will be unable to perform Manual Input if called like this.
+For this to work, the feedback files in the specified directory should contain the team's id as the prefix of each file's name (webserver outputs should have those automatically).
 
 ## Example
-The webserver pipeline of this tool would look like this (requires specification of xlsx-files in config.txt):
-
+The webserver pipeline of this tool could look like this:
 ```
-# Setup database and start webserver
-> python3 assignment_feedback.py -l ssbi25 -o ssbi25 -c ssbi25/config_ssbi25.txt -w
-# TODO: Use GUI to input points and comments, then create feedback archive
+# Start webserver and setup database in outputdirectory (here: 'outs')
+> python3 assignment_feedback.py -l lecture -o outs -c lecture_config.txt
+# TODO: Use GUI to load xlsx-files downloaded from Ilias, input points and comments, then create and unpack feedback archive.
 
-# Upload feedback to Ilias
-> python3 assignment_feedback.py -u 'Feedbacks_Assignment 2'
+# Upload feedback to Ilias by specifying the unpacked directory
+> python3 assignment_feedback.py -m feedback -u 'Feedbacks_Assignment X'
 ```
 
-The manual pipeline for this tool would look like this (requires specification of csv-files containing points and comments in config.txt):
+The legacy pipeline for this tool could look like this (requires specification of csv-files (see [format specifications](#input-csv-formatting)) in config.txt):
 ```
-# For manual usage
-> python3 assignment_feedback.py -c example/config_example.txt
+# For legacy usage
+> python3 assignment_feedback.py -m legacy -l lecture -o outs -c lecture_config.txt
+# TODO: Manually add team id to created output feedback file's names as prefix!
+
+# Upload feedback to Ilias by specifying the renamed feedbacks' directory
+> python3 assignment_feedback.py -m feedback -u 'outs/assX'
 ```
 
 ## Authors
