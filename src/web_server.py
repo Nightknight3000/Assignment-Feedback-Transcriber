@@ -38,14 +38,6 @@ def create_app(lecture_marker, output_dir, config):
     print(os.path.abspath(app.config['DATABASE']))
     print(f"Database path: {app.config['DATABASE']}")
 
-    with app.app_context():
-        db = get_db()
-    # Get assignment names from the database
-    cursor = db.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
-    assignment_list = [table['name'] for table in tables]
-
     dash_app = Dash(lecture_marker, server=app,
         external_scripts=[{
             'src': 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js',
@@ -95,9 +87,7 @@ def create_app(lecture_marker, output_dir, config):
             dbc.Col([
                 dbc.Select(
                     id="assignment-select",
-                    options=[
-                        {"label": assignment, "value": assignment} for assignment in assignment_list
-                    ],
+                    options=[],
                 ),
             ], className='col-2'),
         ], className='mt-3 mb-2 align-items-center'),
@@ -105,6 +95,18 @@ def create_app(lecture_marker, output_dir, config):
             dbc.Col([], id='submission-list', className='mx-auto'),
         ])
     ], id='main-content', fluid='xl')
+
+    @dash_app.callback(Output('assignment-select', 'options'),
+            Input('main-content', 'className'))
+    def get_assignments(yes):
+        with app.app_context():
+            db = get_db()
+        # Get assignment names from the database
+        cursor = db.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        assignment_list = [table['name'] for table in tables]
+        return [{"label": assignment, "value": assignment} for assignment in assignment_list]
 
     @dash_app.callback(Output('submission-list', 'children'),
             Input('assignment-select', 'value'),
