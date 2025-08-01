@@ -7,6 +7,7 @@ import secrets
 import sqlite3
 import zipfile
 import pandas as pd
+from io import BytesIO
 
 import dash
 import dash_bootstrap_components as dbc
@@ -79,7 +80,12 @@ def create_app(lecture_marker, output_dir, config):
                         ), width='auto'),
                 ], className='justify-content-start'),
             width=6),
-            dbc.Col(dbc.Button("Generate Feedbacks", id='generate', className="btn btn-primary", style={'width': '33%'}), width=6, className='d-flex justify-content-end'),
+            dbc.Col(
+                dbc.Row([
+                    dbc.Col(html.Button("Generate Feedbacks", id='generate', className="btn btn-primary"), width='auto'),
+                    dbc.Col(html.Button("Export", id='export', className="btn btn-primary"), width='auto'),
+                ], className='justify-content-end'),
+            width=6),
             dbc.Col(html.Hr(), width=12)
         ], className='mt-3 gy-3 justify-content-between'),
         dbc.Row([
@@ -217,6 +223,7 @@ def create_app(lecture_marker, output_dir, config):
                                         # update n_clicks to match the comment saving state
                                         n_clicks=0 if len(grades) == 0 or not grades.get(task, False) else len(grades.get(task))
                                     ), className='mx-auto col-3'),
+                    # the reached scores will be updated by another callback, see update_score()
                     dbc.Col([html.Span(score, id={'type': 'per-task-total-score', 'index': task}), html.Span(f"/{score} points reached")], className='mx-auto col-6 align-items-center justify-content-end d-flex'),
 
                     # comments input boxes
@@ -520,10 +527,10 @@ def create_app(lecture_marker, output_dir, config):
         os.makedirs('feedbacks', exist_ok=True)
         with app.app_context():
             conn = get_db()
-        groups = pd.read_sql_query(f"SELECT [First Name], [Last Name], Team, Grade FROM [{assignment}]", conn)
+        persons = pd.read_sql_query(f"SELECT [First Name], [Last Name], Team, Grade FROM [{assignment}]", conn)
         conn.close()
 
-        for team, group in groups.groupby('Team'):
+        for team, group in persons.groupby('Team'):
             members = group.reset_index(drop=True)
             student_names = [f"{student[1]['First Name']} {student[1]['Last Name']}"
                              for student in members.iterrows()]
@@ -588,6 +595,70 @@ def create_app(lecture_marker, output_dir, config):
         shutil.rmtree('feedbacks', ignore_errors=True)
 
         return dcc.send_bytes(zip_byte, f"Feedbacks_{assignment}.zip")
+
+    @dash_app.callback(Output('downloader', 'data', allow_duplicate=True),
+                       Input('export', 'n_clicks'),
+                       prevent_initial_call=True)
+    def export_gradings(export):
+        with app.app_context():
+            db = get_db()
+        # Get assignment names from the database
+        cursor = db.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        assignment_list = [table['name'] for table in tables]
+
+        data_to_export = pd.DataFrame(columns=['Name'])
+
+        for assignment in assignment_list:
+            assignment_match = re.search(r'\d+$', assignment)
+            assignment_id = int(assignment_match.group()) if assignment_match else None
+            per_task_scores = read_config(app.config['LECTURE_CONFIG'])['tasks'][assignment_id - 1]
+
+            persons = pd.read_sql_query(f"SELECT [First Name], [Last Name], Team, Grade FROM [{assignment}]", db)
+
+            for student in persons.iterrows():
+                student_name = student[1]['Last Name'] + ', ' + student[1]['First Name']
+
+                if student_name not in data_to_export['Name'].values:
+                    new_row = pd.DataFrame({'Name': [student_name]})
+                    data_to_export = pd.concat([data_to_export, new_row], ignore_index=True)
+
+                try:
+                    feedbacks = json.loads(student[1]['Grade'])
+                except:
+                    feedbacks = {}
+
+                overall_score = 0
+                # Iterate through each task
+                for task, max_points in per_task_scores.items():
+                    if f"A{assignment_id}T{task}" not in data_to_export.columns:
+                        data_to_export[f"A{assignment_id}T{task}"] = 0
+
+                    remaining_points = int(max_points)
+                    # Calculate the remaining points and update the comments
+                    if task in feedbacks.keys():
+                        for penalty, comment in feedbacks[task]:
+                            if penalty is None:
+                                if comment is None: continue    # Empty comment line
+                                else: penalty = 0               # Comment with no penalty
+                            if penalty >= 0:
+                                penalty = -penalty
+                            remaining_points += penalty
+                        if remaining_points < 0:
+                            remaining_points = 0
+                    overall_score += remaining_points
+
+                    data_to_export.loc[data_to_export['Name'] == student_name, f"A{assignment_id}T{task}"] = remaining_points
+                if f"A{assignment_id}_Sum" not in data_to_export.columns:
+                    data_to_export[f"A{assignment_id}_Sum"] = 0
+                data_to_export.loc[data_to_export['Name'] == student_name, f"A{assignment_id}_Sum"] = overall_score
+
+            xlsx_byte = BytesIO()
+            data_to_export.to_excel(xlsx_byte, index=False, sheet_name=dash_app.config['name'])
+        cursor.close()
+
+        return dcc.send_bytes(xlsx_byte.getvalue(), "Grading_summary.xlsx")
     return app
 
 
